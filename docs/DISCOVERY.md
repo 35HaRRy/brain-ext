@@ -6,6 +6,8 @@ Kullanıcı D1–D14'ü ve yalnız sentetik veriyle Faz 1–4 uygulamasını ona
 
 **Bekleyen (sentetik testle kapatılamaz):** gerçek kullanıcı vault'u uyumu/doctor/update/rollback; OAuth ve gerçek MCP araç kataloğu/izinler; gerçek model indirme ve Türkçe eval; K14 gerçek Notion Markdown/link çıktısı; gerçek workspace planı ve paylaşım sınırları. Gerçek OpenCode yapılandırması okunmayacak/oluşturulmayacak; doküman taslağı ayrı kalacak.
 
+Uygulama doğrulaması (Faz 1–4): Python 3.14.6 proje venv'inde paket ve semantik ekstra kurulumu geçti. Gerçek SQLite FTS5/sqlite-vec runtime + sahte embedding, MockTransport ve yerel tokenizer fixture'ları kullanıldı; test ağ erişimi socket düzeyinde engellendi. Gerçek model instantiate/indirme yapılmadı. Geçerli test/atlama ve commit durumu `STATUS.md` içindedir. Bunlar aşağıdaki tarihsel Faz 0 “kurulmadı” ifadelerinin kapsamını yalnız **proje paketi** bakımından günceller; gerçek kullanıcı sistemi hâlâ kurulmadı.
+
 Tarih: 2026-11-03. Durum: **Keşif bulguları; uygulama için kullanıcı onayı bekleniyor. Faz 1 başlamadı.**
 
 ## 1. Kapsam ve kanıt standardı

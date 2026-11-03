@@ -21,3 +21,10 @@ def test_sync_without_token_stops_safely(tmp_path, monkeypatch, capsys):
 def test_missing_config_suggests_init(tmp_path, capsys):
     assert main(["doctor", "--config", str(tmp_path / "missing.toml"), "--json"]) == 1
     assert "brainext init" in capsys.readouterr().err
+
+
+def test_human_output_is_not_a_json_document(tmp_path, capsys):
+    assert main(["init", "--vault", str(tmp_path), "--config", str(tmp_path / "config.toml"), "--dry-run"]) == 0
+    output = capsys.readouterr().out
+    assert not output.lstrip().startswith("{")
+    assert "dry_run:" in output

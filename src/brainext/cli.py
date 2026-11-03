@@ -260,7 +260,17 @@ def main(argv: list[str] | None = None) -> int:
         else:
             config = Config.load(Path(args.config))
             output = dispatch(args, config)
-        print(json.dumps(output, ensure_ascii=False, indent=2))
+        if args.json:
+            print(json.dumps(output, ensure_ascii=False, indent=2))
+        else:
+            labels = {"mode": "mod", "warnings": "uyarılar", "exit_code": "çıkış kodu"}
+            for key, value in output.items():
+                if key == "results":
+                    for row in value:
+                        print(f"- {row.get('path', row.get('query', ''))}: "
+                              f"{row.get('snippet', row.get('title', row))}")
+                else:
+                    print(f"{labels.get(key, key)}: {json.dumps(value, ensure_ascii=False)}")
         return output.get("exit_code", 0)
     except (ValueError, OSError, sqlite3.Error, yaml.YAMLError, ImportError):
         # Never echo exception text: external errors may contain credentials or note content.

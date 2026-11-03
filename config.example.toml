@@ -1,0 +1,23 @@
+[vault]
+path = "C:/CHANGE-ME/vault"
+mirror_dir = "notion"
+outbox_dir = "agent-out"
+state_dir = ".brain-ext"
+companion_dir = "🔮 850-Companion"
+
+[notion]
+api_version = "2026-03-11"
+markdown_version = "v2"
+mirror_trust = "untrusted"
+brain_root_page_id = ""
+agent_workspace_id = ""
+# Plana bağlı limit; query ayrıca ~3/s, paylaşılan workspace bütçesi de uygulanır.
+requests_per_second = 2.5
+token_env_var = "NOTION_TOKEN"
+
+[index]
+embedding_model = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+# Model ayrıca onayla indirilip yerel dizin burada belirtilir; otomatik indirme yok.
+model_path = ""
+rrf_k = 60
+prefix_min_length = 4

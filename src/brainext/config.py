@@ -33,6 +33,14 @@ class Config:
     def __post_init__(self) -> None:
         if not isinstance(self.vault, Path) or not self.vault.is_absolute():
             raise ValueError("Vault yolu mutlak olmalı")
+        for field in fields(self):
+            value = getattr(self, field.name)
+            if isinstance(field.default, str) and not isinstance(value, str):
+                raise ValueError("Metin yapılandırma değeri geçersiz")
+        if type(self.rrf_k) is not int or type(self.prefix_min_length) is not int:
+            raise ValueError("Arama sınırları tamsayı olmalı")
+        if type(self.requests_per_second) not in {int, float}:
+            raise ValueError("İstek hızı sayı olmalı")
         regions = [self.mirror_dir, self.outbox_dir, self.state_dir]
         for name in [*regions, self.companion_dir]:
             if not isinstance(name, str) or len(Path(name).parts) != 1 or name in {".", ".."}:
@@ -40,7 +48,10 @@ class Config:
             safe_path(self.vault, name)
         if len({name.casefold() for name in regions}) != 3:
             raise ValueError("Bölgeler ayrı olmalı")
-        reserved = {"notes", "knowledge", "tasks", self.companion_dir.casefold()}
+        reserved = {
+            "notes", "knowledge", "tasks", self.companion_dir.casefold(),
+            ".claude", ".agents", ".opencode", ".brain", ".beyin-note-write", ".git", "daily", "receipts",
+        }
         if any(x.casefold() in reserved for x in regions):
             raise ValueError("Kaynak not klasörleri sahiplenilemez")
         if self.mirror_dir.startswith(".") or self.outbox_dir.startswith("."):
@@ -65,6 +76,8 @@ class Config:
             raise ValueError("Config bulunamadı; brainext init kullanın")
         with path.open("rb") as stream:
             data = tomllib.load(stream)
+        if set(data) - {"vault", "notion", "index"}:
+            raise ValueError("Bilinmeyen yapılandırma bölümü")
         allowed = {field.name for field in fields(cls)} - {"vault"}
         values: dict = {}
         for section in ("vault", "notion", "index"):

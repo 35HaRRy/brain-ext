@@ -76,3 +76,25 @@ def test_failed_replace_preserves_original(tmp_path, monkeypatch):
         atomic_write(path, "replacement")
     assert path.read_text(encoding="utf-8") == "original"
     assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize("name", [".claude", ".agents", ".opencode", ".brain", ".beyin-note-write", ".git", "receipts", "daily"])
+def test_cannot_claim_managed_or_generated_regions(tmp_path, name):
+    with pytest.raises(ValueError):
+        Config(tmp_path, state_dir=name)
+
+
+@pytest.mark.parametrize("text", ['[vault]\npath="X"\n[index]\nrrf_k="oops"', '[vault]\npath="X"\n[unexpected]\nx=1'])
+def test_malformed_config_has_controlled_error(tmp_path, text):
+    path = tmp_path / "config.toml"
+    path.write_text(text.replace('"X"', json.dumps(tmp_path.as_posix())), encoding="utf-8")
+    with pytest.raises(ValueError):
+        Config.load(path)
+
+
+def test_operation_lock_rejects_competing_writer(tmp_path):
+    from brainext.mdio import operation_lock
+
+    with operation_lock(tmp_path / "state"), pytest.raises(ValueError), operation_lock(tmp_path / "state"):
+        pass
+    assert not (tmp_path / "state/operation.lock").exists()

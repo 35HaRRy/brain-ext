@@ -8,6 +8,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import yaml
+
 from brainext.config import Config
 from brainext.mdio import atomic_write
 
@@ -75,7 +77,7 @@ def doctor(config: Config, token: str | None = None) -> dict:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="Notion aynası ve yerel hafıza araması")
     commands = result.add_subparsers(dest="command", required=True)
-    for name in ("init", "doctor"):
+    for name in ("init", "doctor", "pull", "push"):
         command = commands.add_parser(name)
         command.add_argument("--config", default="config.toml")
         command.add_argument("--json", action="store_true")
@@ -84,6 +86,14 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--vault")
             command.add_argument("--dry-run", action="store_true")
             command.add_argument("--mirror-git", choices=["include", "exclude"])
+        if name in {"pull", "push"}:
+            command.add_argument("--dry-run", action="store_true")
+        if name == "pull":
+            command.add_argument("--page")
+            command.add_argument("--full", action="store_true")
+            command.add_argument("--force", action="store_true")
+            command.add_argument("--confirm-force", action="store_true")
+            command.add_argument("--lock-mirror", action="store_true")
     return result
 
 
@@ -97,12 +107,28 @@ def main(argv: list[str] | None = None) -> int:
             output = initialize(args)
         else:
             config = Config.load(Path(args.config))
-            output = doctor(config, config.token(Path(args.config)))
+            token = config.token(Path(args.config))
+            if args.command == "doctor":
+                output = doctor(config, token)
+            else:
+                if not token:
+                    raise ValueError("Token tanımlı değil")
+                from brainext.notion.client import NotionClient
+                from brainext.notion.pull import pull
+                from brainext.notion.push import push
+
+                with NotionClient(config, token) as client:
+                    if args.command == "pull":
+                        output = pull(config, client, dry_run=args.dry_run, page=args.page,
+                                      full=args.full, force=args.force,
+                                      confirm_force=args.confirm_force, lock_mirror=args.lock_mirror)
+                    else:
+                        output = push(config, client, dry_run=args.dry_run)
         print(json.dumps(output, ensure_ascii=False, indent=2))
         return output.get("exit_code", 0)
-    except (ValueError, OSError, sqlite3.Error):
+    except (ValueError, OSError, sqlite3.Error, yaml.YAMLError, ImportError):
         # Never echo exception text: external errors may contain credentials or note content.
-        print(json.dumps({"hata": "İşlem güvenle durduruldu; yapılandırma/yol/izinleri denetleyin"}, ensure_ascii=False), file=sys.stderr)
+        print(json.dumps({"hata": "İşlem güvenle durduruldu; yapılandırma/yol/izinleri denetleyin. Config yoksa brainext init kullanın"}, ensure_ascii=False), file=sys.stderr)
         return 1
 
 

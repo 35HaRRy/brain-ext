@@ -23,6 +23,10 @@ Depo konumu kullanıcı tarafından `C:\Users\35.HaRRy\Desktop\Projects\brain-ex
 
 Güven sınırı: state bozuksa fail-closed; eşzamanlı yazan komutlar ortak exclusive lock kullanır. Kalan kilit otomatik silinmez. Kullanıcı kaynakları otomatik düzeltilmez.
 
+D14 yerel doğrulama: yalnız `.venv` içine `pip install -e ".[semantic]"` geçti. Python 3.14.6'da FastEmbed 0.9.1 (41 model kaydı), ONNX Runtime 1.31.1 import edildi; RAM SQLite'da `sqlite_vec.load` + `vec_version()` → v0.1.9. Hiçbir embedding modeli instantiate/indirilmedi; 3.12/3.13 fallback gerekmedi. Tokenizer/model kalitesi ve gerçek model inference hâlâ Faz B kapısıdır.
+
+Faz 2: push işaretçisi görünür Markdown satırı `brainext-push-id: <UUID>`. HTML yorumunun uzak Markdown dönüşümünde kaybolma riskinden kaçınılır. Pending kayıt POST/PATCH öncesi yazılır; timeout/5xx sonrası kapsam ve marker doğrulanır, sonuç hâlâ belirsizse `uncertain`, kör yazma tekrarı yok. Database çok data source içeriyorsa `agent_workspace_id` açıkça hedef data source ID olabilir; belirsiz ilk kaynak seçilmez. Sorgu limitinde created_time yarı-açık pencereler bölünür; 32 seviye/1ms sınırında hâlâ capped ise kısmi sonuç ve arşivleme engeli (aynı anda >10000 satır tek timestamp ile ayrıştırılamaz).
+
 ## 2026-11-03 — Faz 0 sınırı
 
 - Durum: **öneri; uygulama için kullanıcı onayı bekleniyor**.

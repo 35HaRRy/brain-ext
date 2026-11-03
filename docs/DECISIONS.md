@@ -27,6 +27,12 @@ D14 yerel doğrulama: yalnız `.venv` içine `pip install -e ".[semantic]"` geç
 
 Faz 2: push işaretçisi görünür Markdown satırı `brainext-push-id: <UUID>`. HTML yorumunun uzak Markdown dönüşümünde kaybolma riskinden kaçınılır. Pending kayıt POST/PATCH öncesi yazılır; timeout/5xx sonrası kapsam ve marker doğrulanır, sonuç hâlâ belirsizse `uncertain`, kör yazma tekrarı yok. Database çok data source içeriyorsa `agent_workspace_id` açıkça hedef data source ID olabilir; belirsiz ilk kaynak seçilmez. Sorgu limitinde created_time yarı-açık pencereler bölünür; 32 seviye/1ms sınırında hâlâ capped ise kısmi sonuç ve arşivleme engeli (aynı anda >10000 satır tek timestamp ile ayrıştırılamaz).
 
+Faz 3: vektörler SQLite BLOB tablosunda; yüklüyse sqlite-vec kosinüs fonksiyonu, yoksa numpy kosinüs aynı arayüzü kullanır. Model girişi için yerel tokenizer truncation/padding kapalı gerçek sayım ve max_tokens'tan `max(8, limit//32)` güvenlik payı. Gerçek model yalnız `model_path` dolu ve yerel dosyalar hazırsa cached-only yüklenir, kendiliğinden indirme yok. Semantik runtime yoksa FTS çalışır; eval'de fallback ölçümleri gerçek vektör/hybrid skoru diye sunulmaz (null + fallback_count).
+
+İndeks aramasında/grafında kaynak hash/gizlilik/yol durumu tekrar doğrulanır; kaynak değiştiyse bayat snippet yerine indekslemeye kadar sonuç dışlanır. `group_by_file` aynı dosyadan yalnız ilk chunk'ı gösterir. Draft indeks kayıtları yalnız explicit path/include-drafts aramasında görünür. Graf yalnız belgelenmiş sözdizimiyle sentetik doğrulandı; `live_fixture_verified: false`, K14 açık.
+
+Güvenlik limiti: bir Markdown genişletmesinde 128 alt-ağaç sonrası içerik eksik-blok/kısmi raporlanır; daha büyük sayfalarda iteratif çözümleme gerekir. Sessiz kırpma yapılmaz.
+
 ## 2026-11-03 — Faz 0 sınırı
 
 - Durum: **öneri; uygulama için kullanıcı onayı bekleniyor**.

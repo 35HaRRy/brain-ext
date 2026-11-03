@@ -1,0 +1,5 @@
+# Sentetik örneklerdir; gerçek kalite ölçümü için kendi 15–20 sorgunuzu yazın.
+- query: "hosting kararımız neydi"
+  expected: ["notion/hosting-karari__ab12cd34.md"]
+- query: "Python projemizin görevleri"
+  expected: ["tasks/python-projesi.md"]

@@ -40,3 +40,22 @@ def test_blocked_reason_in_additional_data_does_not_retry(tmp_path, monkeypatch)
     with NotionClient(Config(tmp_path), "fake", httpx.MockTransport(handler)) as client, pytest.raises(NotionError):
         client.request("GET", "/pages/00000000-0000-0000-0000-000000000001")
     assert len(calls) == 1
+
+
+def test_unknown_subtree_depth_is_bounded_and_marked_partial():
+    from uuid import UUID
+
+    class DeepClient:
+        calls = 0
+
+        def request(self, method, path, **kwargs):
+            self.calls += 1
+            value = UUID(path.split("/")[2]).int
+            following = str(UUID(int=value + 1))
+            return {"markdown": f'<unknown url="https://app.notion.com/p/{following}"/>',
+                    "unknown_block_ids": [following], "truncated": True}
+
+    client = DeepClient()
+    text, partial = _sync.markdown(client, str(UUID(int=1)))
+    assert partial and "notion:eksik-blok" in text
+    assert client.calls <= 128

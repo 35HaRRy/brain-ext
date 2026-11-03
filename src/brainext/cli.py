@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sqlite3
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 
 from brainext.config import Config
-from brainext.mdio import atomic_write
+from brainext.mdio import atomic_write, digest, read_json, write_json
 
 
 def config_text(vault: Path) -> str:
@@ -56,6 +58,10 @@ def initialize(args: argparse.Namespace) -> dict:
 
 
 def doctor(config: Config, token: str | None = None) -> dict:
+    from brainext.notion._sync import Inventory, load_state, retrieve
+    from brainext.notion.client import NotionClient, NotionError
+    from brainext.notion.push import _workspace
+
     connection = sqlite3.connect(":memory:")
     try:
         connection.execute("CREATE VIRTUAL TABLE probe USING fts5(text)")
@@ -64,20 +70,83 @@ def doctor(config: Config, token: str | None = None) -> dict:
         fts5 = False
     finally:
         connection.close()
-    return {
+    report = {
+        "exit_code": 0,
         "fts5": fts5,
         "notion": "canlı erişim ayrıca doğrulanmalı" if token else "atlandı: token tanımlı değil",
         "token_tanimli": bool(token),
         "avenox_doctor": "çalıştırılmadı; Faz B onayı gerekli",
         "embedding": "yerel model ayrıca doğrulanmalı; otomatik indirme yok",
         "index": "var" if (config.state / "index.db").exists() else "henüz yok",
+        "mirror_conflicts": [],
+        "index_stale": True,
+        "warnings": [],
     }
+    try:
+        state = load_state(config, "notion")
+        for entry in state["pages"].values():
+            path = config.path(entry["path"])
+            if not path.is_file() or digest(path.read_bytes()) != entry["content_hash"]:
+                report["mirror_conflicts"].append(entry["path"])
+        if report["mirror_conflicts"]:
+            report["exit_code"] = 2
+    except (ValueError, OSError, KeyError, TypeError):
+        report["warnings"].append("Ayna durum dosyası doğrulanamadı")
+        report["exit_code"] = 2
+    try:
+        import sqlite_vec
+
+        with sqlite3.connect(":memory:") as probe:
+            try:
+                probe.enable_load_extension(True)
+                sqlite_vec.load(probe)
+            finally:
+                probe.enable_load_extension(False)
+            report["vector_backend"] = "sqlite-vec " + probe.execute("SELECT vec_version()").fetchone()[0]
+    except (ImportError, OSError, sqlite3.Error, AttributeError):
+        report["vector_backend"] = "numpy yedeği (kuruluysa); aksi halde yalnızca metin"
+    report["model_cached"] = bool(config.model_path and Path(config.model_path).is_dir())
+    index = config.path(f"{config.state_dir}/index.db")
+    if index.is_file():
+        try:
+            with sqlite3.connect(index.as_uri() + "?mode=ro", uri=True) as database:
+                from brainext.search.index import scan
+
+                rows = database.execute("SELECT path, content_hash FROM docs").fetchall()
+                current = scan(config)
+                report["index_stale"] = dict(rows) != {
+                    path: item["hash"] for path, item in current.items()
+                }
+                report["broken_links"] = database.execute(
+                    "SELECT count(*) FROM links WHERE dst_doc IS NULL"
+                ).fetchone()[0]
+        except (sqlite3.Error, ValueError, OSError):
+            report["warnings"].append("İndeks okunamadı; yeniden indeksleme gerekli")
+            report["exit_code"] = 2
+    if token:
+        try:
+            with NotionClient(config, token) as client:
+                retrieve(client, "page_id", config.brain_root_page_id)
+                _workspace(config, client)
+                inventory = Inventory(client, config.brain_root_page_id).scan()
+                report["notion"] = "kök erişimleri doğrulandı"
+                report["notion_pages"] = len(inventory.pages)
+                if not inventory.complete:
+                    report["warnings"].append("Brain taraması eksik")
+                    report["exit_code"] = 2
+        except (NotionError, ValueError, KeyError, TypeError):
+            report["notion"] = "erişim doğrulanamadı"
+            report["exit_code"] = 2
+        report["warnings"].append("Tam paylaşım envanteri API ile garanti edilemez; portalda denetleyin")
+    if not fts5:
+        report["exit_code"] = 2
+    return report
 
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="Notion aynası ve yerel hafıza araması")
     commands = result.add_subparsers(dest="command", required=True)
-    for name in ("init", "doctor", "pull", "push"):
+    for name in ("init", "doctor", "pull", "push", "index", "sync", "search", "neighbors", "eval"):
         command = commands.add_parser(name)
         command.add_argument("--config", default="config.toml")
         command.add_argument("--json", action="store_true")
@@ -86,7 +155,7 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--vault")
             command.add_argument("--dry-run", action="store_true")
             command.add_argument("--mirror-git", choices=["include", "exclude"])
-        if name in {"pull", "push"}:
+        if name in {"pull", "push", "index", "sync"}:
             command.add_argument("--dry-run", action="store_true")
         if name == "pull":
             command.add_argument("--page")
@@ -94,7 +163,90 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--force", action="store_true")
             command.add_argument("--confirm-force", action="store_true")
             command.add_argument("--lock-mirror", action="store_true")
+        if name == "index":
+            command.add_argument("--reembed", action="store_true")
+        if name == "sync":
+            command.add_argument("--if-stale")
+        if name == "search":
+            command.add_argument("query")
+            command.add_argument("--mode", choices=["text", "vector", "hybrid"], default="hybrid")
+            command.add_argument("--k", type=int, default=8)
+            command.add_argument("--path-prefix")
+            command.add_argument("--include-drafts", action="store_true")
+            command.add_argument("--group-by-file", action="store_true")
+        if name == "neighbors":
+            command.add_argument("target")
+            command.add_argument("--depth", type=int, default=2)
+        if name == "eval":
+            command.add_argument("queries")
     return result
+
+
+def sync_is_fresh(config: Config, interval: str | None) -> bool:
+    if interval is None:
+        return False
+    match = re.fullmatch(r"([1-9][0-9]*)([smhd])", interval)
+    if not match:
+        raise ValueError("Süre 30m gibi olmalı")
+    seconds = int(match[1]) * {"s": 1, "m": 60, "h": 3600, "d": 86400}[match[2]]
+    state = read_json(config.path(f"{config.state_dir}/state/sync_state.json"))
+    if not state:
+        return False
+    if set(state) != {"last_success"} or not isinstance(state["last_success"], str):
+        raise ValueError("Sync durumu geçersiz")
+    last = datetime.fromisoformat(state["last_success"])
+    if last.tzinfo is None:
+        raise ValueError("Sync zamanı saat dilimi içermeli")
+    age = (datetime.now(timezone.utc) - last).total_seconds()
+    return 0 <= age < seconds
+
+
+def dispatch(args: argparse.Namespace, config: Config) -> dict:
+    if args.command == "doctor":
+        return doctor(config, config.token(Path(args.config)))
+    if args.command in {"index", "search", "neighbors", "eval"}:
+        if args.command == "index":
+            from brainext.search.index import build_index
+
+            return build_index(config, dry_run=args.dry_run, reembed=args.reembed)
+        if args.command == "neighbors":
+            from brainext.search.graph import neighbors
+
+            return neighbors(config, args.target, depth=args.depth)
+        from brainext.search.query import evaluate, search
+
+        if args.command == "eval":
+            return evaluate(config, Path(args.queries))
+        return search(config, args.query, mode=args.mode, k=args.k, path_prefix=args.path_prefix,
+                      include_drafts=args.include_drafts, group_by_file=args.group_by_file)
+    if args.command == "sync" and sync_is_fresh(config, args.if_stale):
+        return {"exit_code": 0, "skipped": True, "mesaj": "Senkron henüz bayat değil"}
+    token = config.token(Path(args.config))
+    if not token:
+        raise ValueError("Token tanımlı değil")
+    from brainext.notion.client import NotionClient
+    from brainext.notion.pull import pull
+    from brainext.notion.push import push
+
+    with NotionClient(config, token) as client:
+        if args.command == "push":
+            return push(config, client, dry_run=args.dry_run)
+        if args.command == "pull":
+            return pull(config, client, dry_run=args.dry_run, page=args.page,
+                        full=args.full, force=args.force, confirm_force=args.confirm_force,
+                        lock_mirror=args.lock_mirror)
+        report = pull(config, client, dry_run=args.dry_run)
+    if report["exit_code"] == 1:
+        return report
+    from brainext.search.index import build_index
+
+    indexed = build_index(config, dry_run=args.dry_run)
+    code = max(report["exit_code"], indexed.get("exit_code", 0))
+    if not args.dry_run and code == 0:
+        write_json(config.path(f"{config.state_dir}/state/sync_state.json"), {
+            "last_success": datetime.now(timezone.utc).isoformat(),
+        })
+    return {"exit_code": code, "pull": report, "index": indexed, "dry_run": args.dry_run}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -107,23 +259,7 @@ def main(argv: list[str] | None = None) -> int:
             output = initialize(args)
         else:
             config = Config.load(Path(args.config))
-            token = config.token(Path(args.config))
-            if args.command == "doctor":
-                output = doctor(config, token)
-            else:
-                if not token:
-                    raise ValueError("Token tanımlı değil")
-                from brainext.notion.client import NotionClient
-                from brainext.notion.pull import pull
-                from brainext.notion.push import push
-
-                with NotionClient(config, token) as client:
-                    if args.command == "pull":
-                        output = pull(config, client, dry_run=args.dry_run, page=args.page,
-                                      full=args.full, force=args.force,
-                                      confirm_force=args.confirm_force, lock_mirror=args.lock_mirror)
-                    else:
-                        output = push(config, client, dry_run=args.dry_run)
+            output = dispatch(args, config)
         print(json.dumps(output, ensure_ascii=False, indent=2))
         return output.get("exit_code", 0)
     except (ValueError, OSError, sqlite3.Error, yaml.YAMLError, ImportError):

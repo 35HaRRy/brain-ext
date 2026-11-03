@@ -312,7 +312,8 @@ def markdown(client, id):
         id = canonical(id)
         if id in cache:
             return cache[id]
-        if id in visited:
+        # shortcut: 128 subtrees per page; use iterative expansion for larger documents.
+        if id in visited or len(visited) >= 128:
             partial = True
             return missing(id)
         visited.add(id)

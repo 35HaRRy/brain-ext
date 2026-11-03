@@ -112,6 +112,15 @@ def _finish(config, state, entry, id, path, metadata, body):
     write_note(path, metadata, body)
 
 
+def _mark_uncertain(config, state, entry, path, metadata, body, expected_hash):
+    entry["status"] = "uncertain"
+    write_json(state_path(config, "push"), state)
+    path = config.path(path.relative_to(config.vault).as_posix())
+    # Keep the durable pending outcome, but never restore a snapshot over a later human edit.
+    if digest(path.read_bytes()) == expected_hash:
+        write_note(path, {**metadata, "status": "uncertain"}, body)
+
+
 def push(config, client, *, dry_run=False) -> dict:
     report = result(created=0, updated=0, reconciled=0, skipped=0, uncertain=0, failed=0)
     try:
@@ -126,6 +135,7 @@ def push(config, client, *, dry_run=False) -> dict:
                 try:
                     relative = raw_path.relative_to(config.vault).as_posix()
                     path = config.path(relative)
+                    snapshot = digest(path.read_bytes())
                     metadata, body = read_note(path)
                     entry = entries.get(relative)
                     recover = entry and entry["status"] in {"pending", "uncertain"}
@@ -152,10 +162,7 @@ def push(config, client, *, dry_run=False) -> dict:
                             report["counts"]["reconciled"] += 1
                         else:
                             if not dry_run:
-                                entry["status"] = "uncertain"
-                                write_json(state_path(config, "push"), state)
-                                metadata["status"] = "uncertain"
-                                write_note(path, metadata, body)
+                                _mark_uncertain(config, state, entry, path, metadata, body, snapshot)
                             report["counts"]["uncertain"] += 1
                             problem(report, "Gönderim belirsiz; kör tekrar yapılmadı")
                         continue
@@ -202,10 +209,7 @@ def push(config, client, *, dry_run=False) -> dict:
                         _finish(config, state, entry, id, path, metadata, body)
                         report["counts"]["updated" if existing else "created"] += 1
                     else:
-                        entry["status"] = "uncertain"
-                        write_json(state_path(config, "push"), state)
-                        metadata["status"] = "uncertain"
-                        write_note(path, metadata, body)
+                        _mark_uncertain(config, state, entry, path, metadata, body, snapshot)
                         report["counts"]["uncertain"] += 1
                         problem(report, "Yazma uyarılı veya belirsiz; yeniden gönderilmedi")
                 except (NotionError, ValueError, OSError, KeyError, TypeError, YAMLError):

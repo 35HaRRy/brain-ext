@@ -33,6 +33,8 @@ Faz 3: vektörler SQLite BLOB tablosunda; yüklüyse sqlite-vec kosinüs fonksiy
 
 Güvenlik limiti: bir Markdown genişletmesinde 128 alt-ağaç sonrası içerik eksik-blok/kısmi raporlanır; daha büyük sayfalarda iteratif çözümleme gerekir. Sessiz kırpma yapılmaz.
 
+Son inceleme düzeltmeleri: bölge isimlerinde Windows trailing-dot/space, device ve ADS belirsizlikleri her platformda reddedilir; ham string karşılaştırmasıyla rezerv klasör sınırı kurulmaz. Uncertain push'ta state önce kalıcılaştırılır, taslak ham hash'i başlangıç snapshot'ıyla aynıysa metadata yazılır; değişmişse insanın baytları korunur. D11 veri koruması normal success kadar uncertain/recovery yolunda da geçerlidir.
+
 ## 2026-11-03 — Faz 0 sınırı
 
 - Durum: **öneri; uygulama için kullanıcı onayı bekleniyor**.

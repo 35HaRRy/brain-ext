@@ -10,7 +10,7 @@ Bu depo gerçek vault/Notion/OAuth/OpenCode kurulumu yapmaz. Kullanıcı kurulum
 
 ```powershell
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,semantic]"
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\ruff.exe check .
 ```
@@ -53,3 +53,5 @@ Komutların tamamı `--config <mutlak-config-yolu>`, `--json`, `--verbose` kabul
 Sentetik HTTP, sahte embedding ve gerçek yerel SQLite/FTS/sqlite-vec testleri vardır. Testler gerçek ağ bağlantısını socket düzeyinde engeller. Model/tokenizer adaptörü sentetik yerel tokenizer ile test edilir; model kalitesi veya gerçek Notion sözleşmesi kabul edilmiş sayılmaz. Graf çıktısı K14 tamamlanana kadar `live_fixture_verified: false` taşır.
 
 Gerçek kurulum için [SETUP_GUIDE](docs/SETUP_GUIDE.md)'deki Faz B kapısını izleyin; bu rehberdeki JSON yalnız taslaktır. Gerçek `opencode.json` oluşturulmadı. Doğrulanmayanlar: gerçek vault/Notion/OAuth/kalıcı izinler, gerçek embedding/eval ve K14. Windows'ta symlink ayrıcalığı yoksa ilgili testler açıkça atlanır; junction ve genel yol sınırı testleri ayrıdır.
+
+Eşzamanlılık sınırı: işlem kilidi bu CLI'nın yazarlarını koordine eder. Harici editörlerle OS seviyesinde atomik compare-and-swap garantisi yoktur; aktif senkron sırasında mirror/taslak dosyalarını başka uygulamayla düzenlemeyin. Algılanan değişiklikler korunur ve belirsizlik raporlanır.

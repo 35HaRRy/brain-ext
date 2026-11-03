@@ -6,7 +6,7 @@ import math
 import os
 import tomllib
 from dataclasses import dataclass, fields
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from brainext.mdio import safe_path
 
@@ -43,7 +43,14 @@ class Config:
             raise ValueError("İstek hızı sayı olmalı")
         regions = [self.mirror_dir, self.outbox_dir, self.state_dir]
         for name in [*regions, self.companion_dir]:
-            if not isinstance(name, str) or len(Path(name).parts) != 1 or name in {".", ".."}:
+            windows = PureWindowsPath(name)
+            if (not name or len(windows.parts) != 1 or windows.drive
+                    or name in {".", ".."} or name.endswith((".", " "))
+                    or any(c in '<>:"/\\|?*' or ord(c) < 32 for c in name)
+                    or name.split(".", 1)[0].upper() in {
+                        "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
+                        *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10)),
+                    }):
                 raise ValueError("Bölge adı tek klasör olmalı")
             safe_path(self.vault, name)
         if len({name.casefold() for name in regions}) != 3:

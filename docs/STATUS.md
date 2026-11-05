@@ -159,11 +159,11 @@ Kullanıcı iki doctor kontrolünü ve kalan maddelerin toplu özetini onayladı
 
 | Kabul maddesi | Gerçek kanıt ve kalan sınır |
 |---|---|
-| K1 | İki mirror ile değişmemiş canlı pull izlendi: 4 metadata isteği, 0 Markdown GET, unchanged=2; dosya baytları aynı. 5–10 sayfalık ölçek eksik; kısmi. |
+| K1 | 8 yeni gerçek sayfa (biri iç içe) ile dry-run→pull→ikinci pull geçti: 10 mirror, Türkçe adlar korunmuş, ikinci pull 20 metadata isteği ve 0 Markdown GET, unchanged=10, hata/partial yok. Geçti. |
 | K2 | Sayfa düzenlemeleri sonrası tek mirror güncellemesi görüldü; ayrı başlık yeniden adlandırma senaryosu canlı denenmedi. Temel güncelleme kanıtlı. |
 | K3 | Geçici yerel değişiklik force'suz pull'da korundu; temizleme ve eski indeksin fail-closed davranışı doğrulandı. Geçti (test sayfası). |
 | K4 | Trash→yerel _arsiv/status archived→Restore→normal mirror/index zinciri doğrulandı. Geçti (test sayfası). |
-| K5 | İki sayfalık gerçek mirrorda ölçüldü: bağlantı/doğrulama/kelime/kelimesi hedefi ilk sırada buldu; bağlantıları/doğrulamanın hiç sonuç vermedi. Çekimli sorgu beklentisi karşılanmadı; genel kalite kabulü açık. |
+| K5 | 10 sayfalık gerçek corpus, 15 sorgu: 13/15 hedef ilk 5'te ve çoğu ilk sırada. `bütçesi` ve `kitaplar` 0 sonuç; sorgu belgedeki kökten uzun olduğunda FTS prefix eşleşmiyor. Kısmi; genel çekimli arama kabulü açık. |
 | K6 | Model/semantik karşılaştırma ve gerçek eval kullanıcı kararıyla ertelendi. Geçti sayılmaz. |
 | K7 | Gerçek config ile dry-run olmayan push çalıştı: geçici draft ve mevcut pushed not atlandı; 0 API isteği, 0 yazma. Temizleme ve push state/outbox korunumu doğrulandı. Geçti. |
 | K8 | Onaylı gerçek oluşturma ve ikinci CLI push'ta sıfır API isteğiyle kopya oluşturmama kanıtlı. Geçti (test taslağı). |
@@ -196,7 +196,18 @@ Kullanıcı Faz B kapsamında agent'ın yapabildiği işlemlere toplu onay verdi
 
 ### Kalan kabul sınırları ve kullanıcı işlemleri
 
-- Kullanıcının Brain alanı doğrudan düzenlenmeyecek: K1 için toplam 5–10 test sayfası, K13 için gerçek büyük/truncated sayfa, K14 için eksik database/folder/bağlantı biçimleri kullanıcı tarafından Brain altında hazırlanmalı. Yalnız bunlar hazır olduğunda agent pull/index ve ölçümü çalıştırabilir. Tarihsel URL biçimleri sentetik testte desteklense de canlı çıktı diye sunulmaz.
+- Kullanıcının Brain alanı doğrudan düzenlenmeyecek: K13 için gerçek büyük/truncated sayfa, K14 için eksik database/folder/bağlantı biçimleri kullanıcı tarafından Brain altında hazırlanmalı. Yalnız bunlar hazır olduğunda agent pull/index ve ölçümü çalıştırabilir. Tarihsel URL biçimleri sentetik testte desteklense de canlı çıktı diye sunulmaz.
 - Ayrı yeniden adlandırma deneyi isteniyorsa kullanıcı test sayfasının başlığını Notion'da değiştirmeli. Mevcut sayfa/test içerikleri bu turda uzaktan değiştirilmedi.
 - K5 çekimli sorgu başarısızlığı açık bir ürün sınırıdır; model/eval ertelemesi kaldırılmadan semantik kalite kabulü kapanmaz. Küçük corpus üzerinde tek başarılı çekimli sözcük genel Türkçe kök bulma garantisi değildir.
 - Yeni oturum kurulum blokunu otomatik yüklemeli; statik kayıt/yol doğrulaması yapıldı, bağımsız yeni oturum davranış testi bu oturumda yapılmadı. `.obsidian` oluşturulmadı, sır filtresi/otomatik yedek ayarları değiştirilmedi. Aynı diskteki Git, bağımsız yedek değildir; `.brain-ext/` ve dış runtime kurtarma kapsamı dışında kalır.
+
+## K1 ölçek ve K5 ölçümü — 2026-11-05
+
+Kullanıcı Brain altında 7 üst düzey ve 1 iç içe test sayfası hazırladı; her sayfada benzersiz bir ASCII işaretçi var. Agent Notion'da içerik düzenlemedi.
+
+- [x] Dry-run: new=8, updated=1 (Brain kökü), unchanged=1, failed/archived=0, errors=[]; mirror/outbox/state hash'leri değişmedi, yazma yok.
+- [x] Gerçek pull: new=8, updated=1, unchanged=1, failed/archived=0, errors=[]. Toplam 10 mirror; Çalışma Notları, Günlük Plan, Öğrenme Kaydı, İstanbul Gezisi, Şirket Kararları, Kitap Listesi, Bütçe Taslağı ve Alt Sayfa doğru başlık/dosya adlarıyla geldi; Türkçe karakterler bozulmadı. Alt Sayfa'nın parent_id değeri Çalışma Notları kimliğiyle eşleşti. partial=true yok. Outbox ve push state değişmedi.
+- [x] İkinci pull: unchanged=10, new/updated/archived/failed=0, errors=[]; yalnız 20 metadata GET, 0 Markdown GET; mirror baytları aynı. K1 bu 10 sayfalık gerçek corpus için geçti.
+- [x] Index: indexed=9, unchanged=7, removed=0, eligible=16; text modu, model yok. Ağ engelli aramada sekiz işaretçinin tamamı doğru `notion/` dosyasını 1. sırada buldu.
+- [x] K5 ölçümü aynı corpus ve 15 sorguyla: 13/15 hedef ilk 5'te (çoğu 1.). Başarısız: `bütçesi`, `kitaplar` → 0 sonuç. Neden: FTS prefix, sorgu belgedeki kökten uzun olduğunda eşleşmiyor; ek atılmış sorgu kök bulmanın yerine geçmiyor. Top-5 kabulü bu iki sorgu için karşılanmadı; model/semantik ertelemesi sürüyor.
+- [x] Doctor çıkış 0: notion_pages=10, index_stale=false, mirror_conflicts=[], broken_links=0. PowerShell stdin Türkçe literal bozulması nedeniyle ölçüm komutlarında Unicode kaçışları kullanıldı; ürün hatası değildi.

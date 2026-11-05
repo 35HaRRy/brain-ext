@@ -19,6 +19,19 @@ def rrf(text_ids, vector_ids, k=60):
     return sorted(scores.items(), key=lambda item: (-item[1], item[0]))
 
 
+def text_hits(db, chunks, expression):
+    scores = {}
+    if not expression:
+        return scores
+    for row in db.execute("""SELECT rowid,bm25(chunks_fts) AS score FROM chunks_fts
+                           WHERE chunks_fts MATCH ? ORDER BY score,rowid""", (expression,)):
+        if row["rowid"] in chunks:
+            scores[row["rowid"]] = -row["score"]
+            if len(scores) == 50:
+                break
+    return scores
+
+
 def search(config, query, *, mode="hybrid", k=8, path_prefix=None, include_drafts=False,
            embedder=None, group_by_file=False) -> dict:
     output = {"exit_code": 0, "report": {}, "results": [], "mode": mode, "warnings": []}
@@ -34,13 +47,11 @@ def search(config, query, *, mode="hybrid", k=8, path_prefix=None, include_draft
                   if row["doc_id"] in docs}
         text_scores, vector_scores = {}, {}
         expression = fts_query(query, config.prefix_min_length)
-        if expression:
-            for row in db.execute("""SELECT rowid,bm25(chunks_fts) AS score FROM chunks_fts
-                                   WHERE chunks_fts MATCH ? ORDER BY score,rowid""", (expression,)):
-                if row["rowid"] in chunks:
-                    text_scores[row["rowid"]] = -row["score"]
-                    if len(text_scores) == 50:
-                        break
+        text_scores = text_hits(db, chunks, expression)
+        if not text_scores:
+            # Turkish suffixes make the query longer than the indexed stem; retry shorter.
+            text_scores = text_hits(db, chunks,
+                                    fts_query(query, config.prefix_min_length, stem_trim=3))
         if mode != "text":
             model, warnings = get_embedder(config, embedder)
             output["warnings"].extend(warnings)

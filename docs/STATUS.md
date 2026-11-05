@@ -163,7 +163,7 @@ Kullanıcı iki doctor kontrolünü ve kalan maddelerin toplu özetini onayladı
 | K2 | Canlı yeniden adlandırma: hedef dosya yeni ada taşındı, eski dosya yok, gövde aynı, arama yeni ve eski başlıkla hedefi 1. sırada buldu. Notion'un düzenlenmiş saydığı ek bir sayfa da güncellendi. Ebeveyn aynasındaki çocuk başlığı ancak `--full` ile tazelendi; sınır belgelendi. Geçti (sınırla). |
 | K3 | Geçici yerel değişiklik force'suz pull'da korundu; temizleme ve eski indeksin fail-closed davranışı doğrulandı. Geçti (test sayfası). |
 | K4 | Trash→yerel _arsiv/status archived→Restore→normal mirror/index zinciri doğrulandı. Geçti (test sayfası). |
-| K5 | 10 sayfalık gerçek corpus, 15 sorgu: text eval recall@5=0.867, MRR=0.822; 13/15 ilk 5'te. `bütçesi` ve `kitaplar` 0 sonuç; sorgu belgedeki kökten uzun olduğunda FTS prefix eşleşmiyor. Vector/hybrid model yokluğu nedeniyle 15/15 fallback, ölçülmedi. Kısmi; genel çekimli arama kabulü açık. |
+| K5 | 10 sayfalık gerçek corpus, 15 sorgu: text eval recall@5=1.0, MRR=0.956; 15/15 hedef ilk 5'te. İlk arama 0 sonuç verirse sorgu 3 karaktere kadar kısaltılıp kök önekiyle (`kitap*`) tekrar denenir; bu sözlüksel Türkçe kök çözümleyici değildir. Vector/hybrid model yokluğu nedeniyle 15/15 fallback, ölçülmedi. Metin kabulü geçti; semantik K6 kapsamında açık. |
 | K6 | Model/semantik karşılaştırma ve gerçek eval kullanıcı kararıyla ertelendi. Geçti sayılmaz. |
 | K7 | Gerçek config ile dry-run olmayan push çalıştı: geçici draft ve mevcut pushed not atlandı; 0 API isteği, 0 yazma. Temizleme ve push state/outbox korunumu doğrulandı. Geçti. |
 | K8 | Onaylı gerçek oluşturma ve ikinci CLI push'ta sıfır API isteğiyle kopya oluşturmama kanıtlı. Geçti (test taslağı). |
@@ -238,3 +238,11 @@ Kullanıcı Brain altında 7 üst düzey ve 1 iç içe test sayfası hazırladı
 - [x] Notion URL'sindeki slug `stanbul-Gezisi` görünüyor; bunu Notion üretiyor ve sayfa kimliği sonda sağlam. Kozmetik slug sorunu değil, kimlik kaybı yok. Cevaptaki tüm alanlar aynadan geldiği için K10 kullanıcı teyidiyle geçti; bağımsız bir oturum transkripti yok.
 - [x] K5 sayısal eval: geçici YAML (repoya eklenmedi) ile 15 sorgu. Text recall@5=0.8667, MRR=0.8222, fallback=0. Başarısız: `bütçesi`, `kitaplar`. Vector ve hybrid: fallback=15/15, measured=0, recall/MRR=null; model yok. Bu sonuç metin aramasının ölçümüdür, semantik kalite değildir. Kullanıcı ertelemesi korunarak model indirilmedi.
 - [x] Kalan manuel işler: Obsidian kullanılacaksa vault'u bir kez açmak; `agent-memory-vault` (`.brain-ext` dahil) için bağımsız yedek almak; test sayfalarının temizliğine karar vermek. K13/K14 için gerçek truncated sayfa, folder bağlantısı ve tarihsel URL hâlâ kullanıcı tarafından hazırlanmalı.
+
+## K5 — çekimli sorgu geri dönüşü
+
+- [x] Kök neden: FTS5 ifadesi sorgu kelimesine yalnız sağa `*` ekliyordu. Belgede `bütçe`/`kitap` varken daha uzun çekimli sorgu (`bütçesi`, `kitaplar`) hiçbir tokenla eşleşmiyordu.
+- [x] RED: `bütçesi` ve `kitaplar` için boş sonuç, ilgisiz `zürafa` için de boş sonuç bekleyen testler eklendi; ilk ikisi beklendiği gibi başarısız oldu.
+- [x] GREEN: Yalnız metin araması 0 sonuç verdiğinde sorgu kelimeleri en çok 3 karakter kısaltılıp kök önekiyle tekrar denenir; birincil arama sonuç verdiyse davranış değişmez. Kesim sırasında kelime, yapılandırılmış `prefix_min_length` değerinden kısa bırakılmaz. İndeks şeması, gösterilen metin ve vektör tarafı değişmedi; yeniden indeks gerekmez.
+- [x] Doğrulama: hedefli testler 4/4; tam paket **204 geçti, 3 atlandı** (20.67s). Gerçek 10 sayfalık corpus ve 15 sorgu: text recall@5 **1.0**, MRR **0.956**, fallback=0; `bütçesi` ve `kitaplar` hedefi 1. sırada, `zürafa` hâlâ boş. Vector/hybrid model yokluğu nedeniyle ölçülmedi.
+- Sınır: bu bir kök bulma sezgiselidir, Türkçe morfoloji çözümleyicisi değildir. 3 karakterden uzun ekler veya düzensiz kökler eşleşmeyebilir; yanlış eşleşme riski yalnız sıfır sonuçlu sorgularda devreye girdiği için sınırlıdır. Daha iyisi gerekirse gerçek kök çözümleyici veya trigram indeks ayrı iştir.

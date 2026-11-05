@@ -11,7 +11,11 @@ def fold(text: str) -> str:
                    if not unicodedata.combining(c))
 
 
-def fts_query(text: str, prefix_min_length: int = 4) -> str:
+def fts_query(text: str, prefix_min_length: int = 4, stem_trim: int = 0) -> str:
     # Operators and punctuation are words, never executable FTS syntax.
+    words = re.findall(r"[^\W_]+", fold(text))
+    if stem_trim:
+        words = [word[:max(len(word) - stem_trim, min(len(word), prefix_min_length))]
+                 for word in words]
     return " AND ".join('"' + word + '"' + ("*" if len(word) >= prefix_min_length else "")
-                        for word in re.findall(r"[^\W_]+", fold(text)))
+                        for word in words)

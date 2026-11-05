@@ -56,6 +56,21 @@ def test_non_title_properties_remain_searchable(config):
     assert "'type': 'title'" not in hit["heading_path"]
 
 
+@pytest.mark.parametrize("query", ["bütçesi", "kitaplar"])
+def test_text_search_falls_back_to_shorter_stem_prefix(config, query):
+    note(config, "notion/test.md", "bütçe planı ve kitap listesi", title="Test Notu")
+    assert build_index(config)["exit_code"] == 0
+
+    assert search(config, query, mode="text")["results"]
+
+
+def test_text_search_stem_fallback_does_not_invent_unrelated_matches(config):
+    note(config, "notion/test.md", "bütçe planı ve kitap listesi", title="Test Notu")
+    assert build_index(config)["exit_code"] == 0
+
+    assert not search(config, "zürafa", mode="text")["results"]
+
+
 def test_reembed_refreshes_legacy_text_headings_without_model(config):
     path = note(config, "notion/test.md", "hosting kararı", title="Test Notu")
     assert build_index(config)["exit_code"] == 0

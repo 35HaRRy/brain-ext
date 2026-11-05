@@ -163,12 +163,12 @@ Kullanıcı iki doctor kontrolünü ve kalan maddelerin toplu özetini onayladı
 | K2 | Canlı yeniden adlandırma: hedef dosya yeni ada taşındı, eski dosya yok, gövde aynı, arama yeni ve eski başlıkla hedefi 1. sırada buldu. Notion'un düzenlenmiş saydığı ek bir sayfa da güncellendi. Ebeveyn aynasındaki çocuk başlığı ancak `--full` ile tazelendi; sınır belgelendi. Geçti (sınırla). |
 | K3 | Geçici yerel değişiklik force'suz pull'da korundu; temizleme ve eski indeksin fail-closed davranışı doğrulandı. Geçti (test sayfası). |
 | K4 | Trash→yerel _arsiv/status archived→Restore→normal mirror/index zinciri doğrulandı. Geçti (test sayfası). |
-| K5 | 10 sayfalık gerçek corpus, 15 sorgu: 13/15 hedef ilk 5'te ve çoğu ilk sırada. `bütçesi` ve `kitaplar` 0 sonuç; sorgu belgedeki kökten uzun olduğunda FTS prefix eşleşmiyor. Kısmi; genel çekimli arama kabulü açık. |
+| K5 | 10 sayfalık gerçek corpus, 15 sorgu: text eval recall@5=0.867, MRR=0.822; 13/15 ilk 5'te. `bütçesi` ve `kitaplar` 0 sonuç; sorgu belgedeki kökten uzun olduğunda FTS prefix eşleşmiyor. Vector/hybrid model yokluğu nedeniyle 15/15 fallback, ölçülmedi. Kısmi; genel çekimli arama kabulü açık. |
 | K6 | Model/semantik karşılaştırma ve gerçek eval kullanıcı kararıyla ertelendi. Geçti sayılmaz. |
 | K7 | Gerçek config ile dry-run olmayan push çalıştı: geçici draft ve mevcut pushed not atlandı; 0 API isteği, 0 yazma. Temizleme ve push state/outbox korunumu doğrulandı. Geçti. |
 | K8 | Onaylı gerçek oluşturma ve ikinci CLI push'ta sıfır API isteğiyle kopya oluşturmama kanıtlı. Geçti (test taslağı). |
 | K9 | İki kapsam/sahiplik girişimi gerçek config/durable state ile dry-run'da reddedildi; 0 API isteği. Kapsamı bu iki yerel girişimdir. |
-| K10 | Kullanıcının aktardığı canlı kural yanıtı, skill araç çağrısı teyidi ve doğru kaynaklı yerel FTS sonucu var. Kullanıcı teyidiyle geçti. |
+| K10 | Yeni OpenCode oturumu vault'ta açıldı; kullanıcı notion-brain ve beyin becerilerinin çağrıldığını, app.notion URL'sinin kullanıldığını bildirdi. Cevap kaynak yolu, Notion URL'si, üst sayfa, son düzenleme/senkron zamanı, 13 sayfa ve text modu bilgisini verdi; MCP canlı okuma yapmadığını açıkça söyledi. Aynadaki alanlarla birebir eşleşti. Kullanıcı teyidiyle geçti. |
 | K11 | Kullanıcı CLI ana yöntem/MCP kapalı kararını aldı; MCP yazma onay testi yapılmadı ve mevcut kullanımda etkin değil. Geçti sayılmaz. |
 | K12 | Güncel doctor komutları çalıştı; uyarılar yukarıda açık. Tam uyarısız sağlık iddiası yok. |
 | K13 | 400.526 karakterlik gerçek sayfa tam indirildi; partial/eksik blok yok. `truncated`/bilinmeyen-blok yolu bu boyutta tetiklenmedi; küçük self-unknown fallback ayrı test edildi. Kısmi. |
@@ -230,3 +230,11 @@ Kullanıcı Brain altında 7 üst düzey ve 1 iç içe test sayfası hazırladı
 - [x] Index: indexed=4, unchanged=15, removed=0, eligible=19. Ağ engelli aramada başlık 1. sırada; gövdeden örneklenen 12+ harfli `consectetuer` tokenı ilk 5 içinde aynı sayfayı verdi.
 - [x] İkinci pull: unchanged=13, diğer sayaçlar 0, errors=[]; 0 Markdown GET. Outbox ve push state korundu.
 - [x] K13/K14 kısmi kaldı: gerçek `truncated`/bilinmeyen bloklu çok büyük sayfa, `<folder>` bağlantısı ve tarihsel `notion.so` URL biçimi hâlâ canlı doğrulanmadı. 400k karakterlik tam sayfa ve mention/link/collection graf kenarları doğrulandı; bunlar K13/K14'ün tamamı sayılmaz.
+
+## K10 — yeni oturum kullanımı ve K5 sayısal ölçüm
+
+- [x] Kullanıcı OpenCode'u `agent-memory-vault` içinde yeni oturum olarak açtı. Bildirdiğine göre `notion-brain` ve `beyin` becerileri çağrıldı, `app.notion` URL'si kullanıldı. Oturum cevabı: `notion/İstanbul-Gezisi__40f7ba21.md`, Notion URL'si, üst sayfa Brain, son düzenleme 2026-11-05 12:30 UTC, senkron 12:41 UTC, 13 sayfa değişmemiş, gövde `vapur-izleği-404`, arama metin modunda ve vektör rank yok; MCP ile canlı doğrulama yapılmadığı açıkça belirtildi.
+- [x] Bağımsız kontrol: aynadaki `notion_url`, `last_edited_time`, `synced_at`, parent_id, gövde ve toplam 13 sayfa cevapla birebir eşleşti; state hash dosyayla uyumlu. `opencode.json` instructions `.brain/notion-brain/RULES.md` kayıtlı, notion-brain skill ve plugin mevcut, MCP `disabled: true`. Vault `.opencode/skills` altında ayrı `beyin` skill dosyası bulunamadı; kullanıcının bahsettiği beceri global/avenox tarafında olabilir, dosya düzeyinde doğrulanmadı.
+- [x] Notion URL'sindeki slug `stanbul-Gezisi` görünüyor; bunu Notion üretiyor ve sayfa kimliği sonda sağlam. Kozmetik slug sorunu değil, kimlik kaybı yok. Cevaptaki tüm alanlar aynadan geldiği için K10 kullanıcı teyidiyle geçti; bağımsız bir oturum transkripti yok.
+- [x] K5 sayısal eval: geçici YAML (repoya eklenmedi) ile 15 sorgu. Text recall@5=0.8667, MRR=0.8222, fallback=0. Başarısız: `bütçesi`, `kitaplar`. Vector ve hybrid: fallback=15/15, measured=0, recall/MRR=null; model yok. Bu sonuç metin aramasının ölçümüdür, semantik kalite değildir. Kullanıcı ertelemesi korunarak model indirilmedi.
+- [x] Kalan manuel işler: Obsidian kullanılacaksa vault'u bir kez açmak; `agent-memory-vault` (`.brain-ext` dahil) için bağımsız yedek almak; test sayfalarının temizliğine karar vermek. K13/K14 için gerçek truncated sayfa, folder bağlantısı ve tarihsel URL hâlâ kullanıcı tarafından hazırlanmalı.

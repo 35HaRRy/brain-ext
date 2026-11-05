@@ -333,7 +333,7 @@ def markdown(client, id):
                     link = block.get("link_to_page")
                     if (block.get("object") == "block" and block.get("type") == "link_to_page"
                             and block.get("has_children") is False
-                            and block.get("archived") is False and block.get("in_trash") is False
+                            and not block.get("archived") and not block.get("in_trash")
                             and isinstance(link, dict) and link.get("type") == "page_id"):
                         target = canonical(link.get("page_id")).replace("-", "")
                         replacements[unknown] = f"[Notion page](https://app.notion.com/p/{target})"

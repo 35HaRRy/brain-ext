@@ -428,20 +428,21 @@ def test_self_unknown_page_link_access_failure_stays_partial(self_unknown_page_l
     assert sum(path == f"/blocks/{BLOCK}" for _, path, _ in api.calls) == 1
 
 
-@pytest.mark.parametrize("field", ["archived", "in_trash"])
-@pytest.mark.parametrize("value", [None, 0, "", "missing"])
-def test_self_unknown_page_link_requires_explicit_active_flags(self_unknown_page_link, field, value):
+@pytest.mark.parametrize("archived", ["missing", None])
+def test_self_unknown_page_link_accepts_notion_null_archived(self_unknown_page_link, archived):
     config, _, client, block = self_unknown_page_link
-    if value == "missing":
-        block.pop(field)
+    if archived == "missing":
+        block.pop("archived")
     else:
-        block[field] = value
+        block["archived"] = archived
+    block["in_trash"] = False
 
     report = service("pull")(config, client)
 
-    assert report["exit_code"] == 2
-    assert "notion:eksik-blok" in read_note(mirror(config))[1]
-    assert read_json(config.path(".brain-ext/state/notion_state.json"))["pages"][CHILD]["partial"] is True
+    assert report["exit_code"] == 0
+    assert "[Notion page](https://app.notion.com/p/00000000000000000000000000000008)" in read_note(
+        mirror(config))[1]
+    assert read_json(config.path(".brain-ext/state/notion_state.json"))["pages"][CHILD]["partial"] is False
 
 
 def test_self_unknown_page_link_does_not_hide_markdown_warnings(self_unknown_page_link):

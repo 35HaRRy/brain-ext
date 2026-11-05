@@ -327,6 +327,17 @@ def markdown(client, id):
         replacements = {}
         for unknown in sorted(ids):
             try:
+                if unknown == id:
+                    # Unsupported page-link blocks can return themselves as unknown forever.
+                    block = retrieve(client, "block_id", id)
+                    link = block.get("link_to_page")
+                    if (block.get("object") == "block" and block.get("type") == "link_to_page"
+                            and block.get("has_children") is False
+                            and block.get("archived") is False and block.get("in_trash") is False
+                            and isinstance(link, dict) and link.get("type") == "page_id"):
+                        target = canonical(link.get("page_id")).replace("-", "")
+                        replacements[unknown] = f"[Notion page](https://app.notion.com/p/{target})"
+                        continue
                 replacements[unknown] = fetch(unknown)
             except (NotionError, ValueError):
                 replacements[unknown] = missing(unknown)

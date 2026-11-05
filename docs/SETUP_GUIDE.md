@@ -63,11 +63,15 @@ Doctor çıktısını birlikte oku; 401/403/404'te kapsam ve yetenekleri düzelt
 
 K13: büyük/truncated sayfada `unknown_block_ids`, yerinde replacement ve erişilemeyen blok yorumlarını denetle. 128 subtree güvenlik limiti veya ayrıştırılamayan içerikte sonuç kısmi kalır, başarı diye sunma. Data source limitinde created_time pencereleri kullanılır; tek zaman damgasındaki aşırı kayıtlar kısmi raporlanabilir. 403/404/eksik taramada arşivleme engellenmelidir.
 
+Markdown uç noktası bir `link_to_page` bloğunu kendi unknown ID'siyle tekrar döndürürse, araç blok API'sinden kimliği/türü doğrular ve yalnız aktif, çocuksuz `page_id` bağlantısını yerinde standart Markdown bağlantısına çevirir. Hedef sayfa içeriği indirilmez; UUID'den sabit Notion URL'si üretilir. Diğer blok türleri, geçersiz hedefler, erişim hataları ve Markdown uyarıları kısmi sonuç olarak kalır; bu destek genel bir blok dönüştürücü değildir.
+
 ## 6. Model onayı ve yerel arama
 
 Önce boyutu ve bağlantıya göre değişen süreyi söyle: mpnet ~1.0 GB, MiniLM ~0.22 GB, E5-large ~2.24 GB; tokenizer/ek dosyalar disk ihtiyacını artırabilir. **İndirmeden önce ayrıca onay al.** Kullanıcı seçilen FastEmbed ONNX artifact'ini yerel klasöre indirsin; `model_path` o dizini göstersin. `tokenizer.json` ve seçilen modelin kayıtlı ONNX dosyaları gerekir. Doğrulanmamış bir model indirme komutunu uydurma; resmî FastEmbed model kaydındaki `sources`/`model_file` bilgilerini kullan. Bu sürüm otomatik model indirme komutu sağlamaz.
 
 Model yokken FTS araması çalışır; vector/hybrid istekleri açık text fallback verir. E5 önekleri araç tarafından uygulanır. Model/boyut değişiminde `index --reembed` gerekir; mevcut vektörler karıştırılmaz. Token bütçesinde başlık da sayılır. Uzun kod FTS'de tam, embedding'de satır sınırlarında tutulur; sığmayan tek satır kısmi kapsam olarak bildirilir.
+
+Eski indeksin başlık yolunda ham Notion `title` nesnesi görünüyorsa, düzeltmeden sonra `index --reembed` çalıştırarak türetilmiş başlıkları yenile. Bu seçenek model yokken de metin indeksini yeniden üretir; normal artımlı `index`, kaynak dosyası değişmediyse eski kaydı atlar. Mirror dosyaları değiştirilmez, model indirilmez; yapılandırılmış yerel model varsa vektörler de yeniden hesaplanır.
 
 ```powershell
 .\.venv\Scripts\brainext.exe index --config config.toml --dry-run --json
@@ -82,6 +86,8 @@ Kullanıcı gerçek notlarından 15–20 query/expected kaydı hazırlasın; `ev
 Gerçek test sayfasının GET Markdown v2 çıktısını kullanıcı onayıyla al; `[metin](url)`, mention/page/database/folder XML, wikilink ve id↔url eşlemesini doğrula. Tarihsel notion.so ve app.notion.com/p adreslerini karıştırma; URL kararlı kimlik değildir. K14 tamamlanana kadar rapordaki `live_fixture_verified: false` bir uyarı olarak kalır; kod bunu sentetik testten hareketle true yapmaz.
 
 ## 8. Skill ve kurallar (ayrı kurulum onayı)
+
+Kurulumun mutlak executable/config yollarını yüklenen vault kurallarına kaydet; yeni oturum repo içindeki durum günlüğünü bulmak zorunda kalmasın. MCP kapalı/CLI-only seçilmişse MCP fetch/yorum adımlarının bu kurulumda uygulanmadığını ve canlı okuma için `pull --page <id>` kullanıldığını açıkça belirt; Brain'e doğrudan yazma izni doğmaz. Repo şablonlarına makineye özgü yollar ekleme.
 
 Tek skill hedefi `<vault>/.opencode/skills/notion-brain/SKILL.md`; tek kural hedefi `<vault>/.brain/notion-brain/RULES.md`. Repo `skills/` ve `rules/` dosyalarını yalnız hedefler yoksa kopyala; varsa önce diff göster ve açık üzerine-yazma onayı al. `.agents/skills`e koyma; `skill-import`/`skill-sync` çalıştırma. Yönetilen `.opencode/plugins/beyin-v3.js`, çekirdek beyin skill'leri ve AGENTS blokları değişmez.
 

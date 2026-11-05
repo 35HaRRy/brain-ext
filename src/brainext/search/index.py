@@ -187,7 +187,7 @@ def build_index(config, *, dry_run=False, reembed=False, embedder=None) -> dict:
 
         for relative, item in sorted(sources.items()):
             old = db.execute("SELECT * FROM docs WHERE path=?", (relative,)).fetchone()
-            if old and old["content_hash"] == item["hash"] and (
+            if not reembed and old and old["content_hash"] == item["hash"] and (
                     model is None or old["semantic_complete"]):
                 output["report"]["unchanged"] += 1
                 continue
@@ -202,6 +202,10 @@ def build_index(config, *, dry_run=False, reembed=False, embedder=None) -> dict:
                 metadata, body = item["metadata"], item["body"]
                 title = str(metadata.get("title") or Path(relative).stem)
                 properties = metadata.get("properties")
+                if isinstance(properties, dict):
+                    # The page title is already present; its API formatting is not context.
+                    properties = {name: value for name, value in properties.items()
+                                  if not (isinstance(value, dict) and value.get("type") == "title")}
                 heading = title + (" > " + str(properties) if properties else "")
                 chunks, notices = chunk_document(body, heading, embedder=model,
                                                  model=config.embedding_model)

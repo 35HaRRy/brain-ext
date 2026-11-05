@@ -356,6 +356,105 @@ def test_unknown_cycles_are_bounded_and_repeated_placeholders_reuse_content(setu
     assert read_note(mirror(config))[1] == (f"X<!-- notion:eksik-blok {BLOCK} -->Y" * 2)
 
 
+@pytest.fixture
+def self_unknown_page_link(setup):
+    config, api, client = setup
+    api.markdown[CHILD] = {
+        "markdown": f'A<unknown id="{BLOCK}"/>B<unknown id="{BLOCK}"/>C',
+        "unknown_block_ids": [BLOCK], "truncated": True,
+    }
+    api.markdown[BLOCK] = {
+        "markdown": f'<unknown url="https://app.notion.com/p/{BLOCK}"/>',
+        "unknown_block_ids": [BLOCK], "truncated": True,
+    }
+    block = {**child(BLOCK, CHILD, type="link_to_page"), "archived": False, "in_trash": False,
+             "link_to_page": {"type": "page_id", "page_id": OUTSIDE}}
+    api.overrides["GET", f"/blocks/{BLOCK}"] = lambda _: httpx.Response(200, json=block)
+    return config, api, client, block
+
+
+def test_self_unknown_page_link_is_recovered_without_fetching_target(self_unknown_page_link):
+    from brainext.search.graph import parse_links
+
+    config, api, client, _ = self_unknown_page_link
+
+    report = service("pull")(config, client)
+
+    assert report["exit_code"] == 0
+    body = read_note(mirror(config))[1]
+    link = "[Notion page](https://app.notion.com/p/00000000000000000000000000000008)"
+    assert body == f"A{link}B{link}C"
+    assert parse_links(body) == [
+        ("https://app.notion.com/p/00000000000000000000000000000008", "markdown-link"),
+        ("https://app.notion.com/p/00000000000000000000000000000008", "markdown-link"),
+    ]
+    assert read_json(config.path(".brain-ext/state/notion_state.json"))["pages"][CHILD]["partial"] is False
+    assert sum(path == f"/blocks/{BLOCK}" for _, path, _ in api.calls) == 1
+    assert sum(path == f"/pages/{BLOCK}/markdown" for _, path, _ in api.calls) == 1
+    assert not any(OUTSIDE in path for _, path, _ in api.calls)
+    assert all(method == "GET" for method, _, _ in api.calls)
+
+
+@pytest.mark.parametrize("changes", [
+    {"id": OUTSIDE}, {"id": None}, {"object": "page"}, {"type": "bookmark"},
+    {"archived": True}, {"in_trash": True}, {"has_children": True},
+    {"link_to_page": {"type": "database_id", "database_id": DB}},
+    {"link_to_page": {"type": "page_id", "page_id": "not-a-uuid"}},
+    {"link_to_page": {"type": "page_id"}}, {"link_to_page": []},
+])
+def test_self_unknown_page_link_rejects_unverified_block(self_unknown_page_link, changes):
+    config, api, client, block = self_unknown_page_link
+    block.update(changes)
+
+    report = service("pull")(config, client)
+
+    assert report["exit_code"] == 2
+    missing = f"<!-- notion:eksik-blok {BLOCK} -->"
+    assert read_note(mirror(config))[1] == f"A{missing}B{missing}C"
+    assert not any(OUTSIDE in path for _, path, _ in api.calls)
+
+
+@pytest.mark.parametrize("status", [403, 404])
+def test_self_unknown_page_link_access_failure_stays_partial(self_unknown_page_link, status):
+    config, api, client, _ = self_unknown_page_link
+    api.overrides["GET", f"/blocks/{BLOCK}"] = httpx.Response(status, json={
+        "code": "object_not_found", "message": "secret diagnostic text"})
+
+    report = service("pull")(config, client)
+
+    assert report["exit_code"] == 2
+    assert "notion:eksik-blok" in read_note(mirror(config))[1]
+    assert "secret" not in json.dumps(report)
+    assert sum(path == f"/blocks/{BLOCK}" for _, path, _ in api.calls) == 1
+
+
+@pytest.mark.parametrize("field", ["archived", "in_trash"])
+@pytest.mark.parametrize("value", [None, 0, "", "missing"])
+def test_self_unknown_page_link_requires_explicit_active_flags(self_unknown_page_link, field, value):
+    config, _, client, block = self_unknown_page_link
+    if value == "missing":
+        block.pop(field)
+    else:
+        block[field] = value
+
+    report = service("pull")(config, client)
+
+    assert report["exit_code"] == 2
+    assert "notion:eksik-blok" in read_note(mirror(config))[1]
+    assert read_json(config.path(".brain-ext/state/notion_state.json"))["pages"][CHILD]["partial"] is True
+
+
+def test_self_unknown_page_link_does_not_hide_markdown_warnings(self_unknown_page_link):
+    config, api, client, _ = self_unknown_page_link
+    api.markdown[BLOCK]["warnings"] = [{"code": "unsupported_tag", "message": "warning"}]
+
+    report = service("pull")(config, client)
+
+    assert report["exit_code"] == 2
+    assert "[Notion page](" in read_note(mirror(config))[1]
+    assert read_json(config.path(".brain-ext/state/notion_state.json"))["pages"][CHILD]["partial"] is True
+
+
 def test_committed_hint_outside_workspace_is_not_accepted(setup):
     config, api, client = setup
     path = draft(config)

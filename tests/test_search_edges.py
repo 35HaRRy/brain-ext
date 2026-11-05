@@ -25,6 +25,54 @@ def config(tmp_path):
     return Config(vault=tmp_path)
 
 
+@pytest.mark.parametrize("title_key", ["title", "Ad"])
+def test_notion_title_property_does_not_pollute_heading(config, title_key):
+    properties = {title_key: {"id": "title", "type": "title", "title": [{
+        "type": "text", "text": {"content": "Test Notu", "link": None},
+        "plain_text": "Test Notu", "href": None,
+        "annotations": {"bold": False, "italic": False, "strikethrough": False,
+                        "underline": False, "code": False, "color": "default"},
+    }]}}
+    path = note(config, "notion/test.md", "## Karar\nhosting kararı",
+                title="Test Notu", properties=properties, kind="untrusted")
+    before = path.read_bytes()
+
+    assert build_index(config)["exit_code"] == 0
+    hit = search(config, "hosting", mode="text")["results"][0]
+
+    assert hit["heading_path"] == "Test Notu > Karar"
+    assert path.read_bytes() == before
+
+
+def test_non_title_properties_remain_searchable(config):
+    note(config, "notion/test.md", "hosting kararı", title="Test Notu", properties={
+        "Ad": {"id": "title", "type": "title", "title": []}, "Durum": "Yayında",
+    })
+    assert build_index(config)["exit_code"] == 0
+
+    hit = search(config, "yayında", mode="text")["results"][0]
+
+    assert "Durum" in hit["heading_path"] and "Yayında" in hit["heading_path"]
+    assert "'type': 'title'" not in hit["heading_path"]
+
+
+def test_reembed_refreshes_legacy_text_headings_without_model(config):
+    path = note(config, "notion/test.md", "hosting kararı", title="Test Notu")
+    assert build_index(config)["exit_code"] == 0
+    before = path.read_bytes()
+    with sqlite3.connect(config.state / "index.db") as db:
+        db.execute("UPDATE chunks SET heading_path=?", ("Test Notu > legacy metadata",))
+        db.execute("UPDATE chunks_fts SET heading_path=?", ("legacy metadata",))
+
+    output = build_index(config, reembed=True)
+
+    assert output["exit_code"] == 0
+    assert output["report"]["indexed"] == 1
+    assert search(config, "hosting", mode="text")["results"][0]["heading_path"] == "Test Notu"
+    assert path.read_bytes() == before
+    assert build_index(config)["report"]["unchanged"] == 1
+
+
 def test_embedding_failure_keeps_text_and_retryable_document(config):
     class Broken(FakeEmbedder):
         def embed(self, texts):

@@ -230,6 +230,7 @@ Kullanıcı Brain altında 7 üst düzey ve 1 iç içe test sayfası hazırladı
 - [x] Index: indexed=4, unchanged=15, removed=0, eligible=19. Ağ engelli aramada başlık 1. sırada; gövdeden örneklenen 12+ harfli `consectetuer` tokenı ilk 5 içinde aynı sayfayı verdi.
 - [x] İkinci pull: unchanged=13, diğer sayaçlar 0, errors=[]; 0 Markdown GET. Outbox ve push state korundu.
 - [x] K13/K14 kısmi kaldı: gerçek `truncated`/bilinmeyen bloklu çok büyük sayfa, `<folder>` bağlantısı ve tarihsel `notion.so` URL biçimi hâlâ canlı doğrulanmadı. 400k karakterlik tam sayfa ve mention/link/collection graf kenarları doğrulandı; bunlar K13/K14'ün tamamı sayılmaz.
+- [x] Doctor bu fixture sonrası `broken_links: 2` veriyor (çıkış yine 0). İkisi de `Büyük Sayfa Testi` gövdesinden: satır içi veritabanı kapsayıcı page ID'si ve `collection://` veri kaynağı. Kapsayıcı ayrı sayfa olarak aynalanmadığı, veri kaynağı da belge olmadığı için hedefler yerel grafta çözülemiyor. Bu bir senkron hatası değil, çözülemeyen veritabanı bağlantısı sayımıdır; `broken_links` ham çözülemeyen bağlantı sayısıdır ve çıkış kodunu değiştirmez.
 
 ## K10 — yeni oturum kullanımı ve K5 sayısal ölçüm
 

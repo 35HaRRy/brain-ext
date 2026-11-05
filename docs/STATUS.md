@@ -171,8 +171,8 @@ Kullanıcı iki doctor kontrolünü ve kalan maddelerin toplu özetini onayladı
 | K10 | Kullanıcının aktardığı canlı kural yanıtı, skill araç çağrısı teyidi ve doğru kaynaklı yerel FTS sonucu var. Kullanıcı teyidiyle geçti. |
 | K11 | Kullanıcı CLI ana yöntem/MCP kapalı kararını aldı; MCP yazma onay testi yapılmadı ve mevcut kullanımda etkin değil. Geçti sayılmaz. |
 | K12 | Güncel doctor komutları çalıştı; uyarılar yukarıda açık. Tam uyarısız sağlık iddiası yok. |
-| K13 | Gerçek küçük unsupported/self-unknown blok incelendi ve düzeltildi; büyük/truncated sayfa senaryosu canlı denenmedi. Kısmi. |
-| K14 | Gerçek child-page, mention, link_to_page fallback'i ve çözülmüş graf kenarları kanıtlı; diğer biçimler/tarihsel URL varyantları canlı denenmedi. Kısmi; CLI sabit doğrulama alanı değişmedi. |
+| K13 | 400.526 karakterlik gerçek sayfa tam indirildi; partial/eksik blok yok. `truncated`/bilinmeyen-blok yolu bu boyutta tetiklenmedi; küçük self-unknown fallback ayrı test edildi. Kısmi. |
+| K14 | Canlı mention, link ve satır içi veritabanı/collection bağlantısı çözüldü; graf `İstanbul Gezisi` ve `Çalışma Notları` kenarlarını verdi. `<folder>` ve tarihsel URL varyantı canlı görülmedi. Kısmi; CLI sabit doğrulama alanı değişmedi. |
 
 Öncelik: önce receipt satırsonu güvenliğini kullanıcı onayıyla düzelt; sonra K1/K5 ölçümleri ve kalan canlı biçim/boyut senaryoları. Model/eval ve MCP yazma testleri kullanıcı seçimine rağmen sessizce yeniden kapsam içine alınmaz. Tek diskteki Git geçmişi tam bağımsız yedek değildir; `.brain-ext/` ve vault dışı runtime kurtarması hâlâ ayrı ele alınmalıdır. Faz B'nin tamamı bitti denmez.
 
@@ -220,3 +220,13 @@ Kullanıcı Brain altında 7 üst düzey ve 1 iç içe test sayfası hazırladı
 - [x] `--full` ilk denemede çıkış 2 verdi: `Bağlantı Testi` kısmi işaretlendi. Neden ürün hatası değil, önceki katı `archived is False` kontrolüydü; canlı API aktif blokta `archived: null` döndürüyor. Kontrol truthy değerlere geri alındı; `null`/eksik kabulü ve `true` reddi test edildi. Tek sayfa yenilemesi partial=false yaptı ve `[Notion page](...)` fallback bağlantısını geri getirdi.
 - [x] Index 10 belgeyi yeniledi; arama `Günlük Plan 2027` ve eski `Günlük Plan` önekiyle hedefi 1. sırada buldu; `lale-pusula-742` fallback'li test sayfasını buldu. Outbox ve push state korundu.
 - [x] K2 bu canlı senaryo için sınırıyla geçti. Sınır: çocuk başlığı değişimi ebeveynin zaman damgasını değiştirmezse ebeveyn aynasındaki bağlantı metni `--full` çalıştırılana kadar eski kalabilir; veri kaybı yoktur. Otomatik periyodik `--full` veya ebeveyn başlık tazeliği ayrı iyileştirme konusudur.
+
+## K13/K14 — büyük sayfa ve canlı bağlantı biçimleri
+
+- [x] Dry-run: new=3 (büyük sayfa + 2 satır içi veritabanı satırı), updated=1 (Brain kökü), unchanged=9, failed/archived=0, errors=[]; sıfır yazma.
+- [x] Gerçek pull: aynı sayaçlar, çıkış 0. `Büyük Sayfa Testi` 400.526 karakterle tam geldi; partial=false, eksik/bilinmeyen blok yok. Yani bu boyut `truncated` yolunu tetiklemedi; sonuç tam indirme olarak raporlandı, kısmi sayılmadı. Veritabanı satırları `1.veri`/`2.veri` olarak boş gövdeli ayrı sayfalar hâlinde aynalandı; satır içi veritabanı sayfa olarak aynalanmadı.
+- [x] Gövde bağlantıları: 1 Markdown linki + 3 Notion linki (mention, page link ve `collection://` veritabanı bağlantısı). Hedefler `İstanbul Gezisi` ve `Çalışma Notları` kimlikleriyle eşleşti. `<folder>` biçimi canlı çıktıda yok; kullanıcı eklemedi, Notion'da klasör bağlantısı oluşturulmadı.
+- [x] İndeks sonrası graf `Büyük Sayfa Testi` için Brain, `Çalışma Notları` ve `İstanbul Gezisi` kenarlarını distance=1 verdi. Not: graf indeksten okur; ilk sorgu indeks yenilenmeden yapıldığında 0 kenar görülmüş, indeks sonrası doğru sonuç alınmıştır. Bu bir ürün hatası değil, işlem sırasıdır.
+- [x] Index: indexed=4, unchanged=15, removed=0, eligible=19. Ağ engelli aramada başlık 1. sırada; gövdeden örneklenen 12+ harfli `consectetuer` tokenı ilk 5 içinde aynı sayfayı verdi.
+- [x] İkinci pull: unchanged=13, diğer sayaçlar 0, errors=[]; 0 Markdown GET. Outbox ve push state korundu.
+- [x] K13/K14 kısmi kaldı: gerçek `truncated`/bilinmeyen bloklu çok büyük sayfa, `<folder>` bağlantısı ve tarihsel `notion.so` URL biçimi hâlâ canlı doğrulanmadı. 400k karakterlik tam sayfa ve mention/link/collection graf kenarları doğrulandı; bunlar K13/K14'ün tamamı sayılmaz.

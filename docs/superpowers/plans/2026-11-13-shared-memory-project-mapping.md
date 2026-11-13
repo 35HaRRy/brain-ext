@@ -10,6 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-13-shared-memory-project-mapping-design.md` (kullanıcı onaylı).
 
+## Yürütme özeti — 2026-11-13
+
+Bu planın Task 1–5 uygulaması mevcut `implementation` dalında tamamlandı. Task 6'nın kod incelemesi, tek düzeltme geçişi, sentetik gerçek OpenCode hook testleri, global etkinleştirme, yedek ve dar geri alma kontrolü tamamlandı. İlk gerçek proje kaydı kullanıcıya bırakıldı; iki doğal dil oturumu ve gerçek worktree kabulü henüz yapılmadı. Aşağıdaki adımlar orijinal uygulama referansıdır; tekrar geliştirme başlatmayın.
+
+Kanıt ve kalan kabul maddeleri: `docs/SHARED_MEMORY_SETUP.md` ve spec'in Kabul testleri bölümü. Son suite: 251 passed, 4 skipped; Node 12/12; Ruff/diff temiz. Uygulama commit'leri: `5d90923`, `88e8393`, `739817a`, `7ae96ed`, `3116b57`; inceleme düzeltmeleri `cd69a4b`.
+
+Kullanıcı mevcut dalda çalışmayı açıkça onayladı. Aynı sırada başka bir işlem iki mevcut brief dosyasını `b999c46` commit'ine aldı; bu dosyalara dokunulmadı ve commit korunuyor. Merge, push veya branch silme yapılmadı.
+
 ## Global Constraints
 
 - Global OpenCode adaptörü kullanılacak; bütün oturumlarda etkin olacak. Diskin tamamı taranmayacak.

@@ -55,3 +55,15 @@ Sentetik HTTP, sahte embedding ve gerçek yerel SQLite/FTS/sqlite-vec testleri v
 Gerçek kurulum için [SETUP_GUIDE](docs/SETUP_GUIDE.md)'deki Faz B kapısını izleyin; bu rehberdeki JSON yalnız taslaktır. Gerçek `opencode.json` oluşturulmadı. Doğrulanmayanlar: gerçek vault/Notion/OAuth/kalıcı izinler, gerçek embedding/eval ve K14. Windows'ta symlink ayrıcalığı yoksa ilgili testler açıkça atlanır; junction ve genel yol sınırı testleri ayrıdır.
 
 Eşzamanlılık sınırı: işlem kilidi bu CLI'nın yazarlarını koordine eder. Harici editörlerle OS seviyesinde atomik compare-and-swap garantisi yoktur; aktif senkron sırasında mirror/taslak dosyalarını başka uygulamayla düzenlemeyin. Algılanan değişiklikler korunur ve belirsizlik raporlanır.
+
+## OpenCode ortak hafıza adaptörü
+
+`integrations/opencode/shared-memory/`, mevcut Beyin vault'unu bütün OpenCode
+oturumlarına bağlayan bağımsız V2 eklentisidir. Genel tercihler ortaktır; yalnız
+onaylanmış proje kapsamı otomatik getirilir. Git alt klasörleri aynı proje sayılır;
+Git olmayan kökler de açık onayla bağlanabilir. İlk mesaj sonrası proje tanımlama,
+oturumluk atlama ve kalıcı susturma vardır. Makine yolları kod depolarına yazılmaz.
+
+Bu yol Notion senkronizasyonunu başlatmaz ve ayrı hafıza DB'si oluşturmaz.
+Kurulum, uyum sürümleri, gizlilik sınırları ve geri alma:
+[SHARED_MEMORY_SETUP](docs/SHARED_MEMORY_SETUP.md).

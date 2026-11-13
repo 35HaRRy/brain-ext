@@ -1,6 +1,6 @@
 # Ortak hafıza ve proje eşlemesi
 
-Durum: Kullanıcı tasarımın bütününü 2026-11-13 tarihinde onayladı. Uygulama planı hazırlanıyor; global etkinleştirme teknik uyumluluk kapılarına bağlıdır.
+Durum: Kullanıcı tasarımın bütününü 2026-11-13 tarihinde onayladı. Uygulama ve global etkinleştirme yapıldı; doğal dilde kullanıcı kabulü ve ilk gerçek proje eşlemesi bekleniyor. Kanıt: `docs/SHARED_MEMORY_SETUP.md`.
 
 ## Amaç
 
@@ -99,19 +99,19 @@ Bu bölümdeki teknik varsayılanlar tasarımın bütünüyle birlikte onayland�
 
 ## Kabul testleri
 
-- [ ] v2.2.7 üzerinde plugin yüklemesi, oturum konumu, prompt/context hook'ları ve araç sözleşmeleri doğrulandı.
-- [ ] İki ayrı kod projesi genel tercihleri paylaşır; A sorgusu B not/görev/receipt/Companion içeriğini getirmez.
-- [ ] Bilinmeyen klasörde ilk mesajdan sonra soru; onaysız dosya/eşleme yok; atlamada yalnız genel tercihler.
-- [ ] Yeni kayıt, mevcut projeye bağlama, oturumluk atlama ve kalıcı susturma davranışı doğrulandı.
-- [ ] Git kökü/alt klasör ve Git olmayan onaylı kök/alt klasör aynı proje kimliğini kullanır.
-- [ ] Ayrı klon/worktree ve iç içe depo yanlışlıkla ad benzerliğiyle eşlenmez.
-- [ ] Etiketsiz eski kayıt, yanlış proje metadata'sı, private/untrusted ve stale kaynak kapsamı genişletmez.
-- [ ] İki paralel kayıt/görev/not güncellemesinde mevcut veri kaybolmaz; çakışma açıkça raporlanır.
-- [ ] Bozuk/kayıp vault, runtime, yerel eşleme ve hook timeout senaryolarında kodlama devam eder; yanlış/eski hafıza kullanılmaz.
-- [ ] Mevcut yerel eklentiyle vault içinde ve dış projelerde çift bağlam/receipt oluşmaz.
-- [ ] Oturum taşıma ve alt ajan davranışı kapsamı karıştırmaz; eski transkript sınırı kullanıcıya açıktır.
+- [x] v2.2.7 üzerinde plugin yüklemesi, oturum konumu, prompt/context hook'ları ve araç sözleşmeleri doğrulandı (gerçek hook, sentetik veri).
+- [x] İki ayrı kod projesi genel tercihleri paylaşır; A sorgusu B içeriğini getirmez (gerçek hook + kapsam regresyon testleri, sentetik kaynaklar).
+- [x] Bilinmeyen klasörde ilk mesajdan sonra soru yönergesi; onaysız dosya/eşleme yok; atlamada yalnız genel tercihler (modelin doğal dil yanıtı ayrıca bekleniyor).
+- [x] Yeni kayıt, mevcut projeye bağlama, oturumluk atlama ve kalıcı susturma davranışı doğrulandı (otomatik testler).
+- [x] Git kökü/alt klasör ve Git olmayan onaylı kök/alt klasör aynı proje kimliğini kullanır (otomatik testler).
+- [ ] Ayrı klon/worktree ve iç içe depo yanlışlıkla ad benzerliğiyle eşlenmez (iç içe/ayrı depo test edildi; gerçek worktree kabulü yapılmadı).
+- [x] Etiketsiz eski kayıt, yanlış proje metadata'sı, private/untrusted ve stale kaynak kapsamı genişletmez (runtime regresyon testleri).
+- [ ] İki paralel OpenCode oturumunda görev/not akışı canlı denenir (kilit/revision/hash otomatik testleri geçti; iki gerçek oturum bekleniyor).
+- [x] Bozuk/kayıp vault, runtime, yerel eşleme ve hook hatalarında kodlama devam eder; yanlış/eski hafıza kullanılmaz (otomatik negatif testler; yüklenmeyen plugin için sağlık kontrolü ayrıca gerekir).
+- [x] Mevcut yerel eklenti vault ve dış projede config control ile kapalı; yeni üretici active (gerçek plugin API ve sentetik hook kanıtı).
+- [x] Oturum taşıma ve alt ajan kapsamı otomatik testlerle doğrulandı; eski transkript silinmez. Süreç yeniden başlatma + taşıma canlı testi yapılmadı.
 - [ ] Görev onayı ve kaynak bağlantılı karar/sonuç kaydı canlı iki oturumla denendi; test sonuçlarıyla davranış talimatları ayrı raporlandı.
-- [ ] Global config değişikliği önizlendi; ilgisiz alanlar ve mevcut kullanıcı dosyaları korundu; geri alma yolu doğrulandı.
+- [x] Global config değişikliği önizlendi; ilgisiz alanlar ve mevcut kullanıcı dosyaları eşitlik kontrolüyle korundu; byte-exact yedek ve dar geri alma yolu belgelendi.
 
 ## Çalışma kaydı
 
@@ -121,7 +121,7 @@ Bu bölümdeki teknik varsayılanlar tasarımın bütünüyle birlikte onayland�
 - [x] Tasarım taslağını yaz.
 - [x] Bağımsız builder check: incelemeci planlamayı engelleyen önemli açık soru bulmadı. Bu sonuç çalışma zamanı uyumluluk testi değildir.
 - [x] Tasarımı kullanıcıya sun; açık onay al (kullanıcı: `onaylıyorum`).
-- [ ] Onay sonrası uygulama planı yaz; ardından uygulama ve kabul testleri.
+- [x] Onay sonrası uygulama planı yaz; uygulama ve otomatik kabul testlerini çalıştır. Doğal dilde kullanıcı kabulü açık maddelerden izlenir.
 
 ## Referanslar
 

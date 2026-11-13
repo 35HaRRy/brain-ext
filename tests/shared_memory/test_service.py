@@ -215,6 +215,51 @@ def test_child_only_inherits_verified_parent_project(service, tmp_path):
     assert service.handle(data)["project"] == "alpha"
 
 
+def test_edit_cannot_change_hidden_project_rule(service, tmp_path):
+    root = tmp_path / "code"
+    root.mkdir()
+    bind(service, root)
+    source = "Test-Companion/Kurallar.md"
+    before = service.handle(request(root, "note-read", source=source))["result"]
+    result = service.handle(request(root, "note-edit", source=source,
+        expected_sha256=before["sha256"], edits=[{"old": "B_ONLY", "new": "CHANGED"}]))
+    assert result["status"] == "invalid"
+    assert "B_ONLY" in (service.vault / source).read_text("utf-8")
+
+
+def test_edit_can_change_general_rule_while_preserving_hidden_rules(service, tmp_path):
+    root = tmp_path / "code"
+    root.mkdir()
+    source = "Test-Companion/Kurallar.md"
+    before = service.handle(request(root, "note-read", source=source))["result"]
+    result = service.handle(request(root, "note-edit", source=source,
+        expected_sha256=before["sha256"], edits=[{
+            "old": "General preference.", "new": "Short answers preferred."}]))
+    assert result["status"] == "ok", result
+    text = (service.vault / source).read_text("utf-8")
+    assert "Short answers preferred." in text and "B_ONLY" in text
+
+
+def test_manual_project_card_edit_refreshes_before_catalog_check(service, tmp_path):
+    root = tmp_path / "code"
+    root.mkdir()
+    bind(service, root)
+    card = service.vault / "projects/alpha/Project.md"
+    card.write_text(card.read_text("utf-8").replace("Purpose: A_ONLY", "Purpose: EDITED_CARD"),
+                    encoding="utf-8")
+    result = service.handle(request(root, refresh=True))
+    assert result["status"] == "ok", result
+    assert result["project"] == "alpha"
+
+
+def test_project_rules_and_handoff_load_even_for_unrelated_prompt(service, tmp_path):
+    root = tmp_path / "code"
+    root.mkdir()
+    bind(service, root)
+    result = service.handle(request(root, query="Hello, explain what you can do", refresh=True))
+    assert "A_ONLY" in result["context"]
+
+
 def test_cross_project_search_needs_explicit_scope_and_does_not_rebind(service, tmp_path):
     root = tmp_path / "code"
     root.mkdir()

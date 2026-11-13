@@ -39,6 +39,8 @@ class VaultRuntime:
         self.engine = self._load("beyin_v3")
         self.companion = self._load("beyin_v3_companion")
         validate_contract(self.engine)
+        safe_path(self.vault, ".beyin-projects.json")
+        self.scopes = self.engine.read_project_scopes(self.vault)
         self.store = self.engine.MemoryStore(self.state, self.vault, read_only=True)
 
     def _load(self, name):
@@ -59,7 +61,7 @@ class VaultRuntime:
         selected = []
         for source in wanted:
             for record in records:
-                if record["source"] == source and not record.get("project"):
+                if record["source"] == source and not self.record_scopes(record):
                     record = dict(record)
                     if source.endswith("/Kurallar.md"):
                         record["text"] = self.companion.filter_scoped_rules(
@@ -67,19 +69,19 @@ class VaultRuntime:
                     selected.append(record)
         return self.engine.pack_context(selected, limit=3, budget_chars=budget, stale_count=stale)
 
-    def record_project(self, record: dict) -> str | None:
+    def record_scopes(self, record: dict) -> set[str]:
         source = Path(record.get("source", ""))
         declared = record.get("project") or None
         folder = source.parts[1] if len(source.parts) > 2 and source.parts[0] == "projects" else None
-        if declared:
-            project_id(declared)
-        if folder:
-            project_id(folder)
-        if declared and folder and declared != folder:
-            return None
+        mapped = self.engine.record_scope({"source": source.as_posix()}, self.scopes
+                                          ) if self.scopes else None
+        return {project_id(value) for value in (declared, folder, mapped) if value}
+
+    def record_project(self, record: dict) -> str | None:
+        scopes = self.record_scopes(record)
         if record.get("generated") or record.get("kind") == "receipt":
             return None
-        return declared or folder
+        return next(iter(scopes)) if len(scopes) == 1 else None
 
     def project_catalog(self) -> list[dict]:
         records, _ = self.store._eligible()
@@ -108,6 +110,15 @@ class VaultRuntime:
         if query.strip():
             return scoped.retrieve(query, project=project, budget_chars=budget, strict=True, limit=8)
         return scoped.snapshot_context(project=project, budget_chars=budget, limit=8)
+
+    def continuity_context(self, project: str, budget: int) -> dict:
+        project_id(project)
+        records, stale = self.store._eligible()
+        sources = [f"projects/{project}/{name}" for name in (
+            "Project.md", "Kurallar.md", "Last-Session.md", "Threads.md")]
+        selected = [record for source in sources for record in records
+                    if record["source"] == source and self.record_project(record) == project]
+        return self.engine.pack_context(selected, limit=4, budget_chars=budget, stale_count=stale)
 
     def source_record(self, source: str) -> dict | None:
         safe_path(self.vault, source)

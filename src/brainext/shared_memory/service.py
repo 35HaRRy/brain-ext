@@ -60,19 +60,23 @@ class MemoryService:
                 if parent.get("status") != "mapped" or parent.get("project") != project:
                     project = None
             mode = "project" if project else "general"
+            action = request["action"]
+            if action == "context" and payload.get("refresh") is True:
+                refreshed = runtime.beyin("sync")
+                if refreshed.get("status") != "succeeded":
+                    raise RuntimeUnavailable("source_sync_incomplete")
             catalog = {item["id"]: item for item in runtime.project_catalog()}
             if project and project not in catalog:
                 raise RuntimeUnavailable("project_record_unavailable")
-            action = request["action"]
             if action == "context":
-                if payload.get("refresh") is True:
-                    refreshed = runtime.beyin("sync")
-                    if refreshed.get("status") != "succeeded":
-                        raise RuntimeUnavailable("source_sync_incomplete")
                 general = runtime.general_context(4000)
-                scoped = runtime.project_context(project, str(payload.get("query", ""))[:2000], 6000
+                continuity = runtime.continuity_context(project, 3000) if project else {"records": []}
+                scoped = runtime.project_context(project, str(payload.get("query", ""))[:2000], 3000
                                                  ) if project else {"records": []}
-                records = general["records"] + scoped["records"]
+                unique = {}
+                for record in general["records"] + continuity["records"] + scoped["records"]:
+                    unique.setdefault(record["source"], record)
+                records = list(unique.values())
                 return response(mode=mode, project=project, records=records,
                                 context=self._render({"records": records}),
                                 result={"mapping": mapping})
@@ -161,7 +165,8 @@ class MemoryService:
             raise ValueError("source_excluded")
         companion = runtime.companion.directory(self.vault)
         general = companion and path.parent == companion and path.name in {
-            "Core.md", "Soul.md", "Kurallar.md"} and not meta.get("project")
+            "Core.md", "Soul.md", "Kurallar.md"} and not runtime.record_scopes(
+                {**meta, "source": source})
         if general:
             return path, meta
         if not project or runtime.record_project({**meta, "source": source}) != project:
@@ -169,6 +174,26 @@ class MemoryService:
         if Path(source).parts[0] not in {"projects", "notes", "knowledge", "tasks"}:
             raise ValueError("source_region")
         return path, meta
+
+    @staticmethod
+    def _protected_rules(runtime, text):
+        protected, current = [], []
+
+        def flush():
+            if current and runtime.companion.rule_scopes("".join(current)):
+                protected.append("".join(current))
+            current.clear()
+
+        for line in text.splitlines(keepends=True):
+            if runtime.companion.RULE.match(line):
+                flush()
+                current.append(line)
+            elif current and (not line.strip() or line.startswith("#")):
+                flush()
+            elif current:
+                current.append(line)
+        flush()
+        return protected
 
     def _write(self, runtime, project, action, payload, session):
         payload = dict(payload)
@@ -207,6 +232,11 @@ class MemoryService:
                     after = after.replace(edit["old"], edit["new"], 1)
                 if metadata_of(before) != metadata_of(after):
                     raise ValueError("metadata_changes_require_dedicated_command")
+                if (path.parent == runtime.companion.directory(self.vault)
+                        and path.name == "Kurallar.md"
+                        and self._protected_rules(runtime, before)
+                        != self._protected_rules(runtime, after)):
+                    raise ValueError("scoped_rules_are_protected")
             result = runtime.beyin(action, payload)
             if action == "task-create" and any(result.get(k) != v for k, v in meta.items()):
                 raise RuntimeUnavailable("task_readback")

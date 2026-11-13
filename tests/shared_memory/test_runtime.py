@@ -90,3 +90,24 @@ def test_ambiguous_identity_fails_closed(memory_fixture):
     sync(vault, state)
     with pytest.raises(RuntimeUnavailable):
         VaultRuntime(vault).general_context(4000)
+
+
+def test_registered_vault_folder_scope_is_not_general(memory_fixture):
+    from brainext.shared_memory.runtime import VaultRuntime
+
+    vault, state = memory_fixture
+    (vault / ".beyin-projects.json").write_text(json.dumps({
+        "folders": {"Test-Companion": "beta"}, "shared_unscoped": False}), encoding="utf-8")
+    sync(vault, state)
+    assert "GENERAL_ONLY" not in str(VaultRuntime(vault).general_context(4000))
+
+
+def test_registered_folder_and_metadata_conflict_is_excluded(memory_fixture):
+    from brainext.shared_memory.runtime import VaultRuntime
+
+    vault, state = memory_fixture
+    note(vault, "notes/other/decision.md", "routing WRONG_FOLDER", project="alpha")
+    (vault / ".beyin-projects.json").write_text(json.dumps({
+        "folders": {"notes/other": "beta"}, "shared_unscoped": False}), encoding="utf-8")
+    sync(vault, state)
+    assert "WRONG_FOLDER" not in str(VaultRuntime(vault).project_context("alpha", "routing", 4000))

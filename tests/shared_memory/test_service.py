@@ -191,6 +191,30 @@ def test_context_refresh_reads_manual_preference_edits(service, tmp_path):
     assert "NEW_PREFERENCE" in result["context"]
 
 
+def test_skipped_session_stays_general_even_if_root_is_mapped(service, tmp_path):
+    root = tmp_path / "code"
+    root.mkdir()
+    bind(service, root)
+    data = request(root)
+    data["session"]["general_only"] = True
+    result = service.handle(data)
+    assert result["mode"] == "general"
+    assert "A_ONLY" not in result["context"]
+
+
+def test_child_only_inherits_verified_parent_project(service, tmp_path):
+    root, other = tmp_path / "alpha-code", tmp_path / "beta-code"
+    root.mkdir()
+    other.mkdir()
+    bind(service, root)
+    bind(service, other, "beta", 1)
+    data = request(root)
+    data["session"].update(parent_id="parent", parent_directory=str(other))
+    assert service.handle(data)["mode"] == "general"
+    data["session"]["parent_directory"] = str(root)
+    assert service.handle(data)["project"] == "alpha"
+
+
 def test_cross_project_search_needs_explicit_scope_and_does_not_rebind(service, tmp_path):
     root = tmp_path / "code"
     root.mkdir()

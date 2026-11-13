@@ -52,7 +52,13 @@ class MemoryService:
                 return response("conflict", "general", warnings=["project_mapping_conflict"],
                                 context=self._render(runtime.general_context(4000)),
                                 result={"mapping": mapping})
-            project = mapping["project"]
+            project = None if session.get("general_only") is True else mapping["project"]
+            if session.get("parent_id"):
+                parent_directory = session.get("parent_directory")
+                parent = self.registry.resolve(canonical_directory(parent_directory)
+                                               ) if parent_directory else {}
+                if parent.get("status") != "mapped" or parent.get("project") != project:
+                    project = None
             mode = "project" if project else "general"
             catalog = {item["id"]: item for item in runtime.project_catalog()}
             if project and project not in catalog:

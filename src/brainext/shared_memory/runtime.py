@@ -120,6 +120,8 @@ class VaultRuntime:
             raise RuntimeUnavailable("runtime_command")
         args = [sys.executable, "-B", str(self.scripts / "beyin_v3_cli.py"),
                 "--vault", str(self.vault), "--state", str(self.state), "--json", command]
+        if command == "receipt":
+            args += ["--harness", "opencode"]
         if command == "note-read":
             args.append(payload["source"])
         elif command != "sync":

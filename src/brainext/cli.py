@@ -22,6 +22,8 @@ def config_text(vault: Path) -> str:
         + '\nmirror_dir = "notion"\noutbox_dir = "agent-out"\nstate_dir = ".brain-ext"\n'
         + '\n[notion]\napi_version = "2026-03-11"\nmarkdown_version = "v2"\n'
         + 'mirror_trust = "untrusted"\nbrain_root_page_id = ""\nagent_workspace_id = ""\n'
+        + '# Me ve Carrier için gerçek page ID dizisi; yoksa eski Brain kapsamı kullanılır.\n'
+        + '# memory_root_page_ids = ["<Me-page-id>", "<Carrier-page-id>"]\n'
         + '# Limit plana/endpoint ve paylaşılan workspace bütçesine bağlıdır.\n'
         + 'requests_per_second = 2.5\ntoken_env_var = "NOTION_TOKEN"\n'
         + '\n[index]\nembedding_model = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"\n'
@@ -58,7 +60,7 @@ def initialize(args: argparse.Namespace) -> dict:
 
 
 def doctor(config: Config, token: str | None = None) -> dict:
-    from brainext.notion._sync import Inventory, load_state, retrieve
+    from brainext.notion._sync import Inventory, load_state
     from brainext.notion.client import NotionClient, NotionError
     from brainext.notion.push import _workspace
 
@@ -126,13 +128,16 @@ def doctor(config: Config, token: str | None = None) -> dict:
     if token:
         try:
             with NotionClient(config, token) as client:
-                retrieve(client, "page_id", config.brain_root_page_id)
+                inventories = [
+                    Inventory(client, root, discovery_cache={} if config.memory_root_page_ids else None).scan()
+                    for root in config.memory_roots
+                ]
                 _workspace(config, client)
-                inventory = Inventory(client, config.brain_root_page_id).scan()
                 report["notion"] = "kök erişimleri doğrulandı"
-                report["notion_pages"] = len(inventory.pages)
-                if not inventory.complete:
-                    report["warnings"].append("Brain taraması eksik")
+                report["notion_pages"] = len({id for inv in inventories for id in inv.pages})
+                report["memory_roots"] = list(config.memory_roots)
+                if not all(inv.complete for inv in inventories):
+                    report["warnings"].append("Hafıza kapsamı taraması eksik")
                     report["exit_code"] = 2
         except (NotionError, ValueError, KeyError, TypeError):
             report["notion"] = "erişim doğrulanamadı"
@@ -146,7 +151,8 @@ def doctor(config: Config, token: str | None = None) -> dict:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="Notion aynası ve yerel hafıza araması")
     commands = result.add_subparsers(dest="command", required=True)
-    for name in ("init", "doctor", "pull", "push", "index", "sync", "search", "neighbors", "eval"):
+    for name in ("init", "doctor", "pull", "push", "index", "sync", "search", "neighbors", "eval",
+                 "changes"):
         command = commands.add_parser(name)
         command.add_argument("--config", default="config.toml")
         command.add_argument("--json", action="store_true")
@@ -155,8 +161,19 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--vault")
             command.add_argument("--dry-run", action="store_true")
             command.add_argument("--mirror-git", choices=["include", "exclude"])
-        if name in {"pull", "push", "index", "sync"}:
+        if name in {"pull", "push", "index", "sync", "changes"}:
             command.add_argument("--dry-run", action="store_true")
+        if name == "changes":
+            command.add_argument("verb", choices=["create", "update", "delete", "list",
+                                                  "approve", "apply", "cancel"])
+            command.add_argument("--target")
+            command.add_argument("--title", default="")
+            command.add_argument("--body-file")
+            command.add_argument("--old-text", default="")
+            command.add_argument("--new-text", default="")
+            command.add_argument("--reason", default="")
+            command.add_argument("--item", action="append", default=[])
+            command.add_argument("--id", action="append")
         if name == "pull":
             command.add_argument("--page")
             command.add_argument("--full", action="store_true")
@@ -188,6 +205,11 @@ def sync_is_fresh(config: Config, interval: str | None) -> bool:
     match = re.fullmatch(r"([1-9][0-9]*)([smhd])", interval)
     if not match:
         raise ValueError("Süre 30m gibi olmalı")
+    from brainext.notion.change_store import load
+
+    journal = load(config)
+    if any(op["status"] not in {"applied", "cancelled"} for op in journal["operations"].values()):
+        return False
     seconds = int(match[1]) * {"s": 1, "m": 60, "h": 3600, "d": 86400}[match[2]]
     state = read_json(config.path(f"{config.state_dir}/state/sync_state.json"))
     if not state:
@@ -204,6 +226,21 @@ def sync_is_fresh(config: Config, interval: str | None) -> bool:
 def dispatch(args: argparse.Namespace, config: Config) -> dict:
     if args.command == "doctor":
         return doctor(config, config.token(Path(args.config)))
+    if args.command == "changes":
+        from brainext.notion import changes
+
+        if args.verb == "list":
+            return changes.review(config)
+        if args.verb == "approve":
+            items = {}
+            for raw in args.item:
+                id, separator, expected = raw.partition("=")
+                if not separator or id in items:
+                    raise ValueError("Her --item tekil kimlik=inceleme-özeti olmalı")
+                items[id] = expected
+            return changes.approve(config, items, dry_run=args.dry_run)
+        if args.verb == "cancel":
+            return changes.cancel(config, args.id, dry_run=args.dry_run)
     if args.command in {"index", "search", "neighbors", "eval"}:
         if args.command == "index":
             from brainext.search.index import build_index
@@ -229,24 +266,46 @@ def dispatch(args: argparse.Namespace, config: Config) -> dict:
     from brainext.notion.push import push
 
     with NotionClient(config, token) as client:
+        if args.command == "changes":
+            if args.verb == "apply":
+                return changes.apply(config, client, ids=args.id, dry_run=args.dry_run)
+            body = ""
+            if args.verb == "create":
+                from brainext.search.index import source
+
+                item = source(config, args.body_file) if args.body_file else None
+                if item is None:
+                    raise ValueError("Güvenli, vault-göreli --body-file gerekli")
+                body = item["body"]
+            return changes.propose(
+                config, client, action=args.verb, target=args.target, title=args.title,
+                body=body, old_str=args.old_text, new_str=args.new_text, reason=args.reason,
+                dry_run=args.dry_run,
+            )
         if args.command == "push":
             return push(config, client, dry_run=args.dry_run)
         if args.command == "pull":
             return pull(config, client, dry_run=args.dry_run, page=args.page,
                         full=args.full, force=args.force, confirm_force=args.confirm_force,
                         lock_mirror=args.lock_mirror)
+        from brainext.notion.changes import apply
+
+        changed = apply(config, client, dry_run=args.dry_run)
+        if changed["exit_code"] == 1:
+            return {"exit_code": 1, "changes": changed}
         report = pull(config, client, dry_run=args.dry_run)
     if report["exit_code"] == 1:
         return report
     from brainext.search.index import build_index
 
     indexed = build_index(config, dry_run=args.dry_run)
-    code = max(report["exit_code"], indexed.get("exit_code", 0))
+    code = max(changed["exit_code"], report["exit_code"], indexed.get("exit_code", 0))
     if not args.dry_run and code == 0:
         write_json(config.path(f"{config.state_dir}/state/sync_state.json"), {
             "last_success": datetime.now(timezone.utc).isoformat(),
         })
-    return {"exit_code": code, "pull": report, "index": indexed, "dry_run": args.dry_run}
+    return {"exit_code": code, "changes": changed, "pull": report, "index": indexed,
+            "dry_run": args.dry_run}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -267,8 +326,13 @@ def main(argv: list[str] | None = None) -> int:
             for key, value in output.items():
                 if key == "results":
                     for row in value:
-                        print(f"- {row.get('path', row.get('query', ''))}: "
-                              f"{row.get('snippet', row.get('title', row))}")
+                        if args.command == "changes":
+                            print(json.dumps({k: v for k, v in row.items() if k != "diff"},
+                                             ensure_ascii=False, indent=2))
+                            print(row.get("diff", ""))
+                        else:
+                            print(f"- {row.get('path', row.get('query', ''))}: "
+                                  f"{row.get('snippet', row.get('title', row))}")
                 else:
                     print(f"{labels.get(key, key)}: {json.dumps(value, ensure_ascii=False)}")
         return output.get("exit_code", 0)

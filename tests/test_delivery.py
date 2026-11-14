@@ -72,3 +72,14 @@ def test_delivery_rules_and_single_skill_source():
     assert "K14" in guide and "permissions" in guide
     assert not (root / "opencode.json").exists()
     assert not (root / ".opencode/opencode.json").exists()
+
+
+def test_agent_instructions_teach_the_queue_policy():
+    root = Path(__file__).resolve().parents[1]
+    skill = (root / "skills/notion-brain/SKILL.md").read_text(encoding="utf-8")
+    rules = (root / "rules/RULES.md").read_text(encoding="utf-8")
+    assert "changes create" in skill and "changes update" in skill and "changes delete" in skill
+    assert "changes approve" in skill and "request_hash" in skill
+    assert "Me" in skill and "Carrier" in skill
+    assert "onaysız" in rules and "changes" in rules
+    assert "sync" in rules and "yazma" in rules

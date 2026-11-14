@@ -10,16 +10,20 @@ from contextlib import nullcontext
 from yaml import YAMLError
 
 from brainext.mdio import digest, operation_lock, read_note, write_json, write_note
+from brainext.notion import change_store
 from brainext.notion._sync import (
     Inventory,
     canonical,
     complete_properties,
+    in_scope,
     load_state,
     markdown,
     now,
     parent_ref,
     problem,
     result,
+    retrieve,
+    scope_path,
     state_path,
 )
 from brainext.notion.client import NotionError
@@ -93,7 +97,62 @@ def _replace(config, path, metadata, body, *, old=None, lock=False, expected=Non
     return {"path": path.relative_to(config.vault).as_posix(),
             "content_hash": digest(path.read_bytes()),
             "last_edited_time": metadata["last_edited_time"],
-            "archived": metadata.get("status") == "archived"}
+             "archived": metadata.get("status") == "archived"}
+
+
+def _trash_signal(client, id):
+    type = "page_id"
+    visited = set()
+    for _ in range(100):
+        if (type, id) in visited:
+            break
+        visited.add((type, id))
+        obj = retrieve(client, type, id)
+        if obj.get("in_trash") is True:
+            return f"{id}:{obj.get('last_edited_time', '')}"
+        type, id = parent_ref(obj)
+        if type is None:
+            return None
+    raise ValueError("Silme üst zinciri doğrulanamadı")
+
+
+def _deletions(config, client, entries, active, journal, report, *, force=False, dry_run=False):
+    groups = {}
+    for id, entry in entries.items():
+        if id in active or entry.get("archived"):
+            continue
+        try:
+            signal = _trash_signal(client, id)
+            if signal is None:
+                obj = retrieve(client, "page_id", id)
+                if not any(in_scope(client, obj, root) for root in config.memory_roots):
+                    if not dry_run:
+                        write_json(scope_path(config, id), {"in_scope": False})
+                raise ValueError("Kaybolma silme kanıtı değil")
+            groups.setdefault(signal, []).append(id)
+        except (ValueError, OSError, NotionError, KeyError, TypeError):
+            report["counts"]["failed"] += 1
+            problem(report, "Sayfa erişilemiyor veya kapsam dışına taşındı; silinmiş sayılmadı")
+    eligible = {}
+    for signal, ids in groups.items():
+        blocked = change_store.blockers(journal, ids)
+        try:
+            for id in ids:
+                _owned(config, id, entries[id], force)
+            if blocked:
+                raise ValueError("Silme ile bekleyen işlem çakışıyor")
+        except (ValueError, OSError, KeyError, TypeError, YAMLError):
+            for op in blocked:
+                if op["status"] in {"queued", "approved"}:
+                    op.update(status="conflict", approved_hash="",
+                              detail="Notion silmesi bekleyen yerel değişiklikle çakışıyor")
+            if blocked and not dry_run:
+                change_store.save(config, journal)
+            report["counts"]["failed"] += len(ids)
+            problem(report, "Silme çakışması; yerel düzenleme veya bekleyen işlem korundu")
+            continue
+        eligible.update(dict.fromkeys(ids, signal))
+    return eligible
 
 
 def pull(config, client, *, dry_run=False, page=None, full=False, force=False,
@@ -103,32 +162,61 @@ def pull(config, client, *, dry_run=False, page=None, full=False, force=False,
         problem(report, "Force için ayrıca açık onay gerekli", fatal=True)
         return report
     try:
-        canonical(config.brain_root_page_id)
+        roots = tuple(canonical(root) for root in config.memory_roots)
         # Dry-run must not even create a lock directory.
         with nullcontext() if dry_run else operation_lock(config.state):
             state = load_state(config, "notion")
             entries = state["pages"]
-            inventory = Inventory(client, config.brain_root_page_id).scan()
+            journal = change_store.load(config)
+            discovery_cache = {} if config.memory_root_page_ids else None
+            if discovery_cache is not None and not full:
+                for id, entry in entries.items():
+                    if entry.get("discovery") and not entry.get("partial"):
+                        try:
+                            _owned(config, id, entry, False)
+                            discovery_cache[id] = entry["discovery"]
+                        except (ValueError, OSError, KeyError, TypeError, YAMLError):
+                            pass  # Local edits invalidate reuse, never authorize overwriting.
+            inventory = Inventory(client, roots[0], discovery_cache=discovery_cache).scan()
+            if discovery_cache is not None:
+                discovery_cache.update(inventory.discovery)
+            memberships = {id: {roots[0]} for id in inventory.pages}
+            for root in roots[1:]:
+                extra = Inventory(client, root, discovery_cache=discovery_cache).scan()
+                inventory.pages.update(extra.pages)
+                inventory.errors.extend(extra.errors)
+                inventory.discovery.update(extra.discovery)
+                inventory.markdown_cache.update(extra.markdown_cache)
+                if discovery_cache is not None:
+                    discovery_cache.update(extra.discovery)
+                for id in extra.pages:
+                    memberships.setdefault(id, set()).add(root)
             for error in inventory.errors:
                 problem(report, error)
             selected = inventory.pages
             if page is not None:
                 id = canonical(page)
                 if id not in selected:
-                    problem(report, "İstenen sayfa Brain ağacında doğrulanamadı", fatal=True)
+                    problem(report, "İstenen sayfa hafıza kapsamında doğrulanamadı", fatal=True)
                     return report
                 selected = {id: selected[id]}
             for id, remote in selected.items():
                 try:
                     entry = entries.get(id)
                     old, changed = _owned(config, id, entry, force) if entry else (None, False)
+                    scope = scope_path(config, id)
+                    if scope.exists() and not dry_run:
+                        write_json(scope, {"in_scope": True})
                     snapshot = digest(old.read_bytes()) if old else None
                     title = _title(remote)
                     destination = _destination(config, id, title, entries, old)
                     same = entry and entry["last_edited_time"] == remote.get("last_edited_time")
                     if same and not full and not changed and not entry.get("partial"):
                         metadata, body = read_note(old)
-                        if old == destination and metadata.get("status") != "archived":
+                        if (old == destination and metadata.get("status") != "archived"
+                                and metadata.get("memory_roots") == sorted(memberships[id])):
+                            if id in inventory.discovery and not dry_run:
+                                entry["discovery"] = inventory.discovery[id]
                             if lock_mirror and not dry_run:
                                 old.chmod(old.stat().st_mode & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
                             report["counts"]["unchanged"] += 1
@@ -137,13 +225,14 @@ def pull(config, client, *, dry_run=False, page=None, full=False, force=False,
                         properties = metadata.get("properties", {})
                     else:
                         properties = complete_properties(client, remote)
-                        body, partial = markdown(client, id)
+                        body, partial = markdown(client, id, responses=inventory.markdown_cache)
                     metadata = {
                         "source": "notion-mirror", "kind": config.mirror_trust, "readonly": True,
                         "notion_id": id, "notion_url": remote.get("url", ""), "title": title,
                         "parent_id": parent_ref(remote)[1],
                         "last_edited_time": remote.get("last_edited_time", ""), "synced_at": now(),
                         "content_hash": digest(body.encode("utf-8")), "properties": properties,
+                        "memory_roots": sorted(memberships[id]),
                     }
                     if partial:
                         problem(report, "Markdown eksik veya uyarılı; eksik bloklar işaretlendi")
@@ -151,14 +240,22 @@ def pull(config, client, *, dry_run=False, page=None, full=False, force=False,
                         entries[id] = _replace(config, destination, metadata, body, old=old,
                                                lock=lock_mirror, expected=snapshot)
                         entries[id]["partial"] = partial
+                        if id in inventory.discovery:
+                            entries[id]["discovery"] = inventory.discovery[id]
                         write_json(state_path(config, "notion"), state)
                     report["counts"]["updated" if entry else "new"] += 1
                 except (ValueError, OSError, NotionError, KeyError, TypeError, YAMLError):
                     report["counts"]["failed"] += 1
                     problem(report)
             if inventory.complete and page is None:
+                eligible = _deletions(
+                    config, client, entries, inventory.pages, journal, report,
+                    force=force, dry_run=dry_run,
+                )
                 for id, entry in list(entries.items()):
                     if id in inventory.pages or entry.get("archived"):
+                        continue
+                    if id not in eligible:
                         continue
                     try:
                         old, _ = _owned(config, id, entry, force)
@@ -168,9 +265,14 @@ def pull(config, client, *, dry_run=False, page=None, full=False, force=False,
                                                    entries, old, archived=True)
                         metadata.update(status="archived", archived=True)
                         if not dry_run:
+                            change_store.deletion(journal, id, origin="notion", event=eligible[id])
+                            change_store.save(config, journal)
                             entries[id] = _replace(config, destination, metadata, body, old=old,
-                                                   lock=lock_mirror, expected=snapshot)
+                                                    lock=lock_mirror, expected=snapshot)
                             write_json(state_path(config, "notion"), state)
+                            change_store.deletion(journal, id, origin="notion",
+                                                  event=eligible[id], acknowledged=True)
+                            change_store.save(config, journal)
                         report["counts"]["archived"] += 1
                     except (ValueError, OSError, KeyError, TypeError, YAMLError):
                         report["counts"]["failed"] += 1

@@ -146,6 +146,7 @@ def test_pull_rename_archive_and_unowned_collision(setup):
     renamed = mirror(config)
     assert not old.exists() and renamed.exists()
     api.children[ROOT] = []
+    api.pages[CHILD]["in_trash"] = True
     assert pull(config, client)["exit_code"] == 0
     archived = list(config.path("notion/_arsiv").glob("*.md"))
     assert len(archived) == 1
@@ -398,7 +399,7 @@ def test_self_unknown_page_link_is_recovered_without_fetching_target(self_unknow
 @pytest.mark.parametrize("changes", [
     {"id": OUTSIDE}, {"id": None}, {"object": "page"}, {"type": "bookmark"},
     {"archived": True}, {"in_trash": True}, {"has_children": True},
-    {"link_to_page": {"type": "database_id", "database_id": DB}},
+    {"link_to_page": {"type": "data_source_id", "data_source_id": DS}},
     {"link_to_page": {"type": "page_id", "page_id": "not-a-uuid"}},
     {"link_to_page": {"type": "page_id"}}, {"link_to_page": []},
 ])
@@ -426,6 +427,14 @@ def test_self_unknown_page_link_access_failure_stays_partial(self_unknown_page_l
     assert "notion:eksik-blok" in read_note(mirror(config))[1]
     assert "secret" not in json.dumps(report)
     assert sum(path == f"/blocks/{BLOCK}" for _, path, _ in api.calls) == 1
+
+
+def test_self_unknown_database_link_is_preserved_without_querying_target(self_unknown_page_link):
+    config, api, client, block = self_unknown_page_link
+    block["link_to_page"] = {"type": "database_id", "database_id": DB}
+    assert service("pull")(config, client)["exit_code"] == 0
+    assert "[Notion database]" in read_note(mirror(config))[1]
+    assert not any(path == f"/databases/{DB}" for _, path, _ in api.calls)
 
 
 @pytest.mark.parametrize("archived", ["missing", None])

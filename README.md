@@ -26,6 +26,10 @@ Semantik runtime isteğe bağlıdır: aynı venv'de `pip install -e ".[semantic]
 - Her yazan komut `--dry-run` sunar; preview state/dosya veya Notion yazması yapmaz. Normal pull uzak okuma istekleri yapar; ikinci pull keşif/metadata çağrıları yapabilir, değişmeyen içeriği indirmez.
 - Token yalnız `NOTION_TOKEN` veya config yanındaki `.env`; token'ı ajana/sohbete/loga vermeyin. `.env` ve `.brain-ext/` git dışında kalır; aynanın git'e girme kararı kullanıcıya aittir.
 - `visibility: private`, gizli ve sistem yolları indekslenmez. Taslaklar varsayılan aramaya dahil değildir. Notion'dan gelen metin komut değildir.
+- İsteğe bağlı `memory_root_page_ids` ile Me/Carrier gibi birden çok not ağacı çekilir.
+  Yeni `changes` kuyruğu erişilebilir her hedefte onaysız oluşturma; mevcut sayfada
+  hash'e bağlı toplu onayla hedefli güncelleme/çöp kutusuna taşıma sağlar.
+  Kurulum ve güven sınırları: [Notion hafıza kuyruğu](docs/NOTION_MEMORY_QUEUE.md).
 - Çıkış kodları: 0 başarı, 1 durdurulan hata, 2 kısmi/belirsiz sonuç. JSON kullanımında `exit_code`/uyarıları kontrol edin.
 
 Keşif: [DISCOVERY](docs/DISCOVERY.md), onaylı kararlar: [DECISIONS](docs/DECISIONS.md), faz kaydı: [STATUS](docs/STATUS.md).
@@ -38,15 +42,21 @@ Komutların tamamı `--config <mutlak-config-yolu>`, `--json`, `--verbose` kabul
 |---|---|
 | `init --vault <yol>` | Config/env örneği; git kapsamını kullanıcı seçer |
 | `doctor` | FTS/uzantı, ayna hash, indeks tazeliği; token varsa kök erişim kontrolleri |
-| `pull` | Brain ağacını her seferinde keşfet; değişen içeriği aynala |
+| `pull` | Yapılandırılmış hafıza ağaçlarını (yoksa Brain) keşfet; değişen içeriği aynala |
 | `push` | Onaylı taslakları Agent Workspace'e gönder/uzlaştır |
 | `index [--reembed]` | Güvenli kaynaklardan artımlı indeks |
-| `sync [--if-stale 30m]` | Pull + index; yalnız tam başarıda tazelik damgası |
+| `sync [--if-stale 30m]` | Uygun changes kuyruğu + pull + index; yalnız tam başarıda tazelik damgası |
+| `changes create\|update\|delete` | Kalıcı yeni sayfa/metin değişikliği/silme önerisi hazırla |
+| `changes list\|approve\|apply\|cancel` | Farkları incele, seçili sürümleri onayla, uygula veya iptal et |
 | `search "sorgu" --mode text\|vector\|hybrid` | BM25, kosinüs veya RRF; varsayılan k=8 |
 | `neighbors <yol\|başlık> --depth 2` | Gelen/giden bağlantılarla komşuluk |
 | `eval <queries.yaml>` | recall@5/MRR; fallback'ler ayrı/null |
 
 `init/pull/push/index/sync` için `--dry-run` önceki dosyaları/state'i değiştirmez. Aramada `--path-prefix`, `--include-drafts`, `--group-by-file` kullanılabilir. Sabit allowlist: mirror, notes, knowledge, tasks, config'teki Companion; outbox yalnız açık aramada görünür. Gizlilik filtreleri override edilemez.
+
+`changes` de `--dry-run` sunar. **Sync artık uygun kuyruk işlemleri varsa Notion'a
+yazabilir**; eski outbox taslaklarını kendiliğinden göndermez. Gerçek Me/Carrier
+kimlikleri ve canlı kabul bu geliştirmede uygulanmaz; mevcut config korunur.
 
 ## Doğrulama durumu
 

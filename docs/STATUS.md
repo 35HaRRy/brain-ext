@@ -2,6 +2,139 @@
 
 Spec: `docs/spec/BRIEF-EK-1-KESIF-SONRASI.md` önceliklidir.
 
+## 2026-11-14 — Notion ana kaynaklı hafıza ve değişiklik kuyruğu
+
+Yeni kapsam/politika: Me ve Carrier alt ağaçları için isteğe bağlı
+`memory_root_page_ids`; erişilebilir tüm hedeflerde onaysız yeni sayfa oluşturma;
+mevcut sayfa güncelleme/çöp kutusuna taşıma için hash'e bağlı toplu onay.
+Bu yeni özellik için tasarım:
+`docs/superpowers/specs/2026-11-14-notion-memory-queue-design.md`.
+Kullanım ve geçiş: `docs/NOTION_MEMORY_QUEUE.md`.
+
+- Çoklu kök keşfi ve kimlikle tekilleştirme; eski config için Brain kökü korunur.
+- Kalıcı `changes` kuyruğu, diff/etkilenen alt sayfa incelemesi, toplu onay,
+  hedefli metin güncelleme, alt ağaç sürüm denetimli trash ve belirsiz yazmanın
+  salt okunur uzlaştırılması eklendi. Sync uygun kuyruk varsa uzak yazma yapabilir.
+- Doğrulanmış Notion trash durumunda yerel arşiv ve kalıcı UUID/alındı geçmişi;
+  bekleyen öneri/yerel düzenlemede çakışma. Kaybolma/403/404 tek başına silme
+  kanıtı değildir; bu güvenlik şartı eski config'e de uygulanır.
+- Kapsam dışına taşındığı doğrulanan notun baytları korunur; ayrı scope işareti
+  arama erişimini kapatır. Geri dönüşte yeniden erişilebilir. Bozuk işaret
+  fail-closed davranır. Yeni kapsamla eşleşmeyen eski mirror'lar aranmaz.
+- Bağımsız kod incelemesinin iki önemli bulgusu regresyon testlerinde
+  RED→GREEN düzeltildi. Repo skill/kurallarının yeni politikayı öğrettiği ayrı
+  okuyucuyla kontrol edildi; kurulu vault kopyaları değiştirilmedi.
+- Son doğrulama: **307 passed, 4 skipped** (115.51s); ruff ve diff-check temiz.
+  Bunlar sentetik API ve yerel dosya/indeks testleridir; canlı kabul değildir.
+- Gerçek Me/Carrier kimlikleri henüz ayarlanmadı. Config/token/vault runtime
+  değiştirilmedi; Notion'da yeni yazma/silme yapılmadı. Scheduler/webhook yok.
+  `.brain-ext/state/`, `.brain-ext/scope/` ve mirror birlikte yedeklenmelidir.
+  Notion tarafında atomik CAS garantisi yoktur; eşzamanlı düzenleme riski sürer.
+
+### Canlı kurulum — 2026-11-14
+
+- Kullanıcı Me ve Carrier bağlantılarını vererek kurulumun sonraki adımını
+  başlattı. İki kök, yalnız bu iki page GET'ine izin veren koruma altında erişilebilir
+  ve aktif olarak doğrulandı; sayfa gövdeleri veya token çıktıya alınmadı.
+- Gerçek config'e `memory_root_page_ids` eklendi: Me
+  `a3c50592-dec8-410b-b6f0-acff7be786fd`, Carrier
+  `e612edbd-19eb-448d-948c-d98b87678426`. Eski Brain/Agent Workspace kimlikleri ve
+  diğer tüm ayarlar TOML karşılaştırmasıyla korundu.
+- Güncel skill vault'a kuruldu; ortak kurallar repo kaynağıyla eşleşiyor. Kurulu
+  kuralların makineye özgü executable/config yolları ve metin araması tercihi
+  korundu; eski Agent Workspace-only not değiştirme paragrafı kuyruk politikasıyla
+  güncellendi. `opencode.json` baytları değişmedi; MCP hâlâ kapalı.
+- Değişiklik öncesi üç dosyanın yedeği ve hash manifesti:
+  `C:\Users\35.HaRRy\AppData\Local\Temp\opencode\brainext-memory-deploy-ntn518lw`.
+  Kurulum sonrası 18 mevcut mirror/outbox/state dosyası bayt korunumu doğrulandı;
+  değişiklik kuyruğu boş.
+- Salt okunur API korumalı `pull --dry-run` başlatıldı; sonuç bekleniyor.
+  Gerçek pull/index veya Notion oluşturma/güncelleme/silme henüz yapılmadı.
+- İlk önizleme iki saati aşmasına rağmen ilerleme/sonuç üretmedi. Kullanıcının
+  açık onayıyla yalnız bu işe ait, oluşturulma zamanı ve ebeveyn zinciri doğrulanan
+  süreçler durduruldu; eksik tarama başarı sayılmadı.
+- Aynı yedek klasöründeki `preview_with_progress.py` ile yeniden başlatıldı:
+  30 saniyelik sayaç kaydı, HTTP durumları/tekrar sayıları, benzersiz sayfa sayısı,
+  etkin istek türü ve 600 saniyelik watchdog. Token/sayfa gövdesi loglanmaz.
+  Sentetik self-test GET'e izin, tüm uzak yazmaları engelleme, raporda içerik/kimlik
+  sızdırmama ve süre sınırında yeni istek yapmama kontrollerini geçti.
+  İlerleme: `dry-run-progress.json`/`.jsonl`; sonuç: `dry-run-result.json`;
+  timeout olursa içeriksiz Python çağrı yığını: `dry-run-stacks.txt`.
+  Yeni tarama sonucu henüz bekleniyor; gerçek aktarım başlatılmadı.
+- Yeniden tarama 600 saniyede watchdog ile `timeout` olarak durdu. 1351 istek
+  başlatıldı, 1350 başarılı HTTP 200 yanıtı alındı; 1283 block-children isteği ve
+  64 data-source query çağrısı var. 429/5xx veya tekrar denemeye dair sayaç yok.
+  Markdown indirme aşamasına henüz ulaşılmadı. Çağrı yığını ilk kökün
+  `Inventory.scan → database/data-source satırları → iç içe _children` yolunda.
+  Kanıt: tıkanmış tek istek değil, kapsam keşfinde pahalı ve ilerleyen blok taraması.
+- Sonuç raporu `dry-run-result.json`: 18 korunan dosya ve config/yönergeler
+  değişmemiş; uzak yazma sıfır. `unique_pages_read=2` yalnız doğrudan page GET
+  yanıtlarını sayar, sorgu sonuçlarındaki tüm sayfaların sayısı değildir.
+  Tarama tamamlanmış kabul edilmedi ve gerçek pull/index başlatılmadı.
+- Kullanıcı keşif optimizasyonunu onayladı. Me/Carrier için tam v2 Markdown
+  etiketleriyle fiziksel alt sayfa/veritabanı keşfi, eksik/uyarılı durumda eski
+  blok taramasına dönüş, aynı yanıttan mirror içeriği ve sürüme bağlı alt sayfa
+  önbelleği eklendi. `--full` önbelleği atlar; dry-run kalıcı cache yazmaz.
+  Silme öncesi strict ağaç taraması değişmedi, legacy varsayılan korundu.
+- Yeni sentetik performans örneği aynı kapsamda 102 yerine 2 istek yaptı.
+  Son tam suite **324 passed, 4 skipped** (93.17s); ruff/diff-check temiz.
+  Bağımsız odaklı inceleme ve yeni canlı süre-sınırlı ölçüm henüz bekleniyor.
+  Eski ölçüm dosyaları yedek klasöründeki `before-optimization/` altında korundu.
+- Bağımsız incelemenin bozuk folder/unknown etiketi bulgusu testte
+  RED→GREEN düzeltildi. Son tam suite **328 passed, 4 skipped** (101.29s);
+  ruff/diff-check temiz.
+- Optimize edilmiş yöntemle aynı 600 saniyelik canlı önizleme başlatıldı.
+  120. saniye örneği: 6358 veritabanı satırı, query/page yanıtlarından toplam
+  6360 benzersiz sayfa görülmüş, 38 Markdown yanıtı tamamlanmış (önceki ölçümde
+  sıfırdı). Tam kapsam sayısı veya tamamlanma yüzdesi değildir. 6358 içerik
+  isteğinin kendisi bile 2.5 istek/s ayarında yaklaşık 42 dakika gerektirir;
+  10 dakika yalnız teşhis süresi sınırıdır. Son sonuç henüz bekleniyor.
+- Optimize edilmiş ilk uzun ölçüm de 600 saniyede durdu: 219 Markdown yanıtı,
+  1073 block-children isteği; veri ve kurulum ayarları korundu. Küçük teknik
+  örnekleme gerçek yanıtlarda `unknown_block_ids=[]` olmasına rağmen `<unknown>`
+  bulunduğunu gösterdi. Sahipliği doğrulanan alt öğesiz `link_to_page` blokları
+  hem page hem database hedefli olabiliyor.
+- Mevcut bağlantı fallback'i bu boş-liste biçimine genişletildi. Yalnız aktif,
+  mevcut sayfaya ait, alt öğesiz ve geçerli hedefli bağlantılar normalleştirilir;
+  hedef içerik okunmaz. Diğer bilinmeyenler strict taramaya döner. Bu düzeltme
+  aynı zamanda mirror'da bağlantının eksik-blok işaretine dönüşmesini önler.
+- Son doğrulama: **338 passed, 4 skipped** (86.56s), ruff/diff-check temiz.
+  Canlı üç satırlık sınırlı örnekte 3/3 hızlı keşif, 5 istek, sıfır block-children
+  çağrısı ve sıfır inventory hatası görüldü; korunan dosyalar değişmedi.
+  `discovery-leaf-link-verification.json` raporu aynı yedek klasöründedir.
+  Bu yalnız örnek doğrulamasıdır; tam kapsam kabulü veya gerçek pull/index değildir.
+- Kullanıcı ilk gerçek aktarım ve indeksleme için açıkça `başla` onayı verdi.
+  `initial_import.py` ile gerçek pull → yerel indeks işi başlatıldı. Notion
+  istek katmanı yalnız GET ve data-source okuma sorgularına izin verir;
+  changes/apply/push çağrılmaz. İndeks aşamasında ağ ayrıca engellenir.
+- İş öncesinde mirror/outbox/state ve gerçek config'in doğrulanan yedeği alınır;
+  yürüyen işlem kilidi yedeğe dahil edilmez. Windows'ta SQLite doğrulama
+  bağlantısının kapatılmasına ilişkin self-test sorunu düzeltildi ve tam
+  sentetik pull → index → kök indeks kontrolü `IMPORT_SELF_TEST_PASSED` verdi.
+- İş klasörü:
+  `C:\Users\35.HaRRy\AppData\Local\Temp\opencode\brainext-memory-deploy-ntn518lw\initial-import-20261114`.
+  `import-progress.json`/`.jsonl` 30 saniyelik sayaçları ve keşif/yazma/indeks
+  aşamasını; `pull-result.json` ve `import-result.json` son durumları taşır.
+  `backup/` hassas not/state verisi içerir; aynı diskte yerel kopyadır.
+  Dört saatlik süre sınırı yeni istek/yazma öncesinde güvenli kesilir; atomik
+  yazma veya SQLite işlemi ortasında zorla sonlandırma yapılmaz.
+  İş devam ediyor; tam aktarım/indeks kabulü henüz yapılmadı.
+- İlk gerçek iş yaklaşık 110 dakikada bitti; sonuç **kısmi (exit_code=2)**.
+  Pull: 7639 yeni, 1 güncellenmiş, 12 arşivlenmiş, 0 başarısız; 8 sayfada
+  eksik/uyarılı Markdown var. Aktif Notion mirror sayısı 7640; bu sayıya 8
+  kısmi sayfa dahildir. İndeks: exit_code=0, text modu, 7640 yeni/güncel,
+  6 değişmeyen yerel belge; toplam 7646 belge. İki kök de indekste doğrulandı.
+- Tamamen ağ engelli son doğrulama: 7652 mirror state kaydı (7640 aktif,
+  12 arşiv), sıfır dosya/hash çakışması, 40882 chunk ve aynı sayıda FTS satırı.
+  12 arşivlenmiş eski notun gövdeleri işlem öncesi yedekle eşleşiyor.
+  Outbox değişmedi, işlem kilidi bırakıldı, Notion'a uzak yazma sayısı sıfır.
+- `initial-import-20261114/import-result.json` ve `offline-verification.json`
+  aggregate kanıtlardır. `partial-pages.json` 8 eksik sayfanın yerel yol/Notion
+  kimliklerini içerir; adlar veya gövdeler sohbet çıktısına taşınmadı. Tüm 8
+  sayfada eksik-blok işareti var. Arama kullanılabilir; tam içerik kabulü bu
+  sekiz sayfa incelenene kadar açık kalır. Yeni pull veya Notion yazma/silme
+  kabul testi bu sonuçtan otomatik başlatılmadı.
+
 - [x] Faz 1: paket, config, init/doctor — 6 test geçti; ruff temiz; Python 3.14.6 venv kurulumu geçti.
 - [x] Faz 2: Notion mock senkron — 71 toplam test geçti; ruff temiz. Kapsam keşfi, hash/rename/arşiv, belirsiz yazma uzlaştırması, created_time pencereleme ve CLI bağlantıları.
 - [x] Faz 3: yerel arama/graf/eval — 168 test geçti, 3 atlama (gerçek model, Windows yetkisi olmayan iki symlink testi); junction testi geçti. Ruff temiz.

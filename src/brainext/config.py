@@ -7,6 +7,7 @@ import os
 import tomllib
 from dataclasses import dataclass, fields
 from pathlib import Path, PureWindowsPath
+from uuid import UUID
 
 from brainext.mdio import safe_path
 
@@ -23,6 +24,7 @@ class Config:
     mirror_trust: str = "untrusted"
     brain_root_page_id: str = ""
     agent_workspace_id: str = ""
+    memory_root_page_ids: tuple[str, ...] = ()
     requests_per_second: float = 2.5
     token_env_var: str = "NOTION_TOKEN"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
@@ -33,6 +35,16 @@ class Config:
     def __post_init__(self) -> None:
         if not isinstance(self.vault, Path) or not self.vault.is_absolute():
             raise ValueError("Vault yolu mutlak olmalı")
+        roots = self.memory_root_page_ids
+        if not isinstance(roots, tuple):
+            raise ValueError("Hafıza kökleri tuple olmalı")
+        try:
+            canonical = tuple(str(UUID(root)) for root in roots)
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError("Hafıza kök kimliği geçersiz") from None
+        if len(set(canonical)) != len(canonical):
+            raise ValueError("Hafıza kökleri yinelenemez")
+        object.__setattr__(self, "memory_root_page_ids", canonical)
         for field in fields(self):
             value = getattr(self, field.name)
             if isinstance(field.default, str) and not isinstance(value, str):
@@ -74,6 +86,10 @@ class Config:
         return safe_path(self.vault, relative)
 
     @property
+    def memory_roots(self) -> tuple[str, ...]:
+        return self.memory_root_page_ids or (self.brain_root_page_id,)
+
+    @property
     def state(self) -> Path:
         return self.path(self.state_dir)
 
@@ -98,6 +114,10 @@ class Config:
                     raise ValueError("Bilinmeyen yapılandırma anahtarı")
                 if key in values:
                     raise ValueError("Tekrarlanan yapılandırma anahtarı")
+                if key == "memory_root_page_ids":
+                    if not isinstance(value, list) or not value:
+                        raise ValueError("Hafıza kökleri boş olmayan dizi olmalı")
+                    value = tuple(value)
                 values[key] = value
         raw = data.get("vault", {}).get("path", "")
         if not raw:

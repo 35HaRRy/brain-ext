@@ -9,6 +9,7 @@ from uuid import UUID
 
 from brainext.mdio import read_json
 from brainext.notion.client import NotionError
+from brainext.notion.discovery import children_from_markdown, unknown_refs
 
 
 def canonical(value):
@@ -35,6 +36,10 @@ def state_path(config, name):
     return config.path(f"{config.state_dir}/state/{name}_state.json")
 
 
+def scope_path(config, id):
+    return config.path(f"{config.state_dir}/scope/{canonical(id)}.json")
+
+
 def load_state(config, kind):
     key = "pages" if kind == "notion" else "drafts"
     path = state_path(config, kind)
@@ -48,7 +53,8 @@ def load_state(config, kind):
         if not isinstance(item, dict):
             raise ValueError("Durum kaydı geçersiz")
         if kind == "notion":
-            if set(item) - {"path", "content_hash", "last_edited_time", "archived", "partial"}:
+            if set(item) - {"path", "content_hash", "last_edited_time", "archived", "partial",
+                            "discovery"}:
                 raise ValueError("Bilinmeyen ayna durum alanı")
             if any(type(item[field]) is not bool for field in ("archived", "partial") if field in item):
                 raise ValueError("Ayna durum alanı geçersiz")
@@ -68,6 +74,19 @@ def load_state(config, kind):
                 raise ValueError("Ayna özeti geçersiz")
             if not isinstance(item["last_edited_time"], str):
                 raise ValueError("Ayna zamanı geçersiz")
+            if "discovery" in item:
+                cached = item["discovery"]
+                if (not isinstance(cached, dict)
+                        or set(cached) != {"last_edited_time", "children"}
+                        or not isinstance(cached["last_edited_time"], str)
+                        or not cached["last_edited_time"]
+                        or not isinstance(cached["children"], list)):
+                    raise ValueError("Keşif önbelleği geçersiz")
+                for ref in cached["children"]:
+                    if (not isinstance(ref, list) or len(ref) != 2
+                            or ref[0] not in {"page_id", "database_id"}
+                            or canonical(ref[1]) != ref[1]):
+                        raise ValueError("Keşif alt sayfa kimliği geçersiz")
         else:
             target = config.path(id)
             if not target.is_relative_to(config.path(config.outbox_dir)) or target.suffix != ".md":
@@ -130,6 +149,39 @@ def in_scope(client, obj, root, cache=None):
             cache[key] = retrieve(client, type, parent)
         obj = cache[key]
     return False
+
+
+def _leaf_link(block):
+    link = block.get("link_to_page")
+    if (block.get("object") == "block" and block.get("type") == "link_to_page"
+            and block.get("has_children") is False
+            and not block.get("archived") and not block.get("in_trash")
+            and isinstance(link, dict) and link.get("type") in {"page_id", "database_id"}):
+        type = link["type"]
+        target = canonical(link.get(type)).replace("-", "")
+        label = "page" if type == "page_id" else "database"
+        return f"[Notion {label}](https://app.notion.com/p/{target})"
+    return None
+
+
+def _unlisted_page_links(client, id, data, cache=None):
+    if (not isinstance(data.get("markdown"), str) or data.get("truncated") is not False
+            or data.get("unknown_block_ids") != [] or data.get("warnings")):
+        return data
+    cache = {} if cache is None else cache
+    text = data["markdown"]
+    for raw, bid in unknown_refs(text):
+        try:
+            key = ("block_id", bid)
+            if key not in cache:
+                cache[key] = retrieve(client, "block_id", bid)
+            block = cache[key]
+            link = _leaf_link(block)
+            if link and in_scope(client, block, id, cache):
+                text = text.replace(raw, link)
+        except (NotionError, ValueError, KeyError, TypeError):
+            pass  # Unverified markers remain visible and require the strict fallback.
+    return {**data, "markdown": text}
 
 
 class IncompleteQuery(ValueError):
@@ -200,13 +252,16 @@ def data_source_rows(client, id):
 
 
 class Inventory:
-    def __init__(self, client, root):
+    def __init__(self, client, root, *, discovery_cache=None):
         self.client = client
         self.root = canonical(root)
         self.pages = {}
         self.cache = {}
         self.visited = set()
         self.errors = []
+        self.discovery_cache = discovery_cache
+        self.discovery = {}
+        self.markdown_cache = {}
 
     @property
     def complete(self):
@@ -225,7 +280,8 @@ class Inventory:
             obj = retrieve(self.client, type, id) if obj is None else obj
             if canonical(obj.get("id")) != id or not in_scope(self.client, obj, self.root, self.cache):
                 # A linked external database is not part of this root's inventory.
-                if type in {"database_id", "data_source_id"}:
+                if type in {"database_id", "data_source_id"} or (
+                        type == "page_id" and self.discovery_cache is not None):
                     return
                 raise ValueError("Sayfa kapsam dışında")
             self.cache[type, id] = obj
@@ -233,7 +289,8 @@ class Inventory:
                 return
             if type == "page_id":
                 self.pages[id] = obj
-                self._children(id)
+                if self.discovery_cache is None or not self._markdown_children(id, obj):
+                    self._children(id)
             elif type == "block_id":
                 self._children(id)
             elif type == "database_id":
@@ -250,6 +307,27 @@ class Inventory:
                     self._visit(row_type + "_id", row["id"], row)
         except (NotionError, ValueError, KeyError, TypeError):
             self.errors.append("Ağaç taraması eksik; arşivleme kapatıldı (10000 satır sınırı dahil)")
+
+    def _markdown_children(self, id, obj):
+        revision = obj.get("last_edited_time")
+        if not isinstance(revision, str) or not revision:
+            return False
+        cached = self.discovery_cache.get(id)
+        if cached and cached["last_edited_time"] == revision:
+            refs = cached["children"]
+        else:
+            try:
+                data = self.client.request("GET", f"/pages/{id}/markdown",
+                                           params={"markdown_version": "v2"})
+                data = _unlisted_page_links(self.client, id, data, self.cache)
+                self.markdown_cache[id] = data
+                refs = children_from_markdown(data)
+            except (NotionError, ValueError, KeyError, TypeError):
+                return False
+        self.discovery[id] = {"last_edited_time": revision, "children": refs}
+        for type, child in refs:
+            self._visit(type, child)
+        return True
 
     def _children(self, id):
         if ("children", id) in self.visited:
@@ -299,7 +377,7 @@ def complete_properties(client, page):
     return properties
 
 
-def markdown(client, id):
+def markdown(client, id, *, responses=None):
     visited = set()
     cache = {}
     partial = False
@@ -317,7 +395,10 @@ def markdown(client, id):
             partial = True
             return missing(id)
         visited.add(id)
-        data = client.request("GET", f"/pages/{id}/markdown", params={"markdown_version": "v2"})
+        data = (responses or {}).get(id)
+        if data is None:
+            data = client.request("GET", f"/pages/{id}/markdown", params={"markdown_version": "v2"})
+        data = _unlisted_page_links(client, id, data)
         text = data.get("markdown")
         if not isinstance(text, str):
             raise ValueError("Markdown yanıtı eksik")
@@ -330,13 +411,9 @@ def markdown(client, id):
                 if unknown == id:
                     # Unsupported page-link blocks can return themselves as unknown forever.
                     block = retrieve(client, "block_id", id)
-                    link = block.get("link_to_page")
-                    if (block.get("object") == "block" and block.get("type") == "link_to_page"
-                            and block.get("has_children") is False
-                            and not block.get("archived") and not block.get("in_trash")
-                            and isinstance(link, dict) and link.get("type") == "page_id"):
-                        target = canonical(link.get("page_id")).replace("-", "")
-                        replacements[unknown] = f"[Notion page](https://app.notion.com/p/{target})"
+                    link = _leaf_link(block)
+                    if link:
+                        replacements[unknown] = link
                         continue
                 replacements[unknown] = fetch(unknown)
             except (NotionError, ValueError):

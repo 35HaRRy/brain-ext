@@ -10,7 +10,8 @@ from pathlib import Path
 
 import yaml
 
-from brainext.mdio import digest, operation_lock, read_note
+from brainext.mdio import digest, operation_lock, read_json, read_note
+from brainext.notion._sync import scope_path
 from brainext.search.chunker import chunk_document
 from brainext.search.embed import get_embedder
 from brainext.search.normalize import fold
@@ -52,6 +53,16 @@ def source(config, relative):
         path = config.path(relative)
         raw = path.read_bytes()
         metadata, body = read_note(path)
+        if (Path(relative).parts[0] == config.mirror_dir
+                and metadata.get("source") == "notion-mirror"):
+            scope = scope_path(config, metadata.get("notion_id"))
+            if scope.exists() and read_json(scope) != {"in_scope": True}:
+                return None
+        if config.memory_root_page_ids and Path(relative).parts[0] == config.mirror_dir:
+            roots = metadata.get("memory_roots")
+            if (not isinstance(roots, list) or not all(isinstance(root, str) for root in roots)
+                    or not set(roots) & set(config.memory_root_page_ids)):
+                return None
         if (fold(str(metadata.get("visibility", ""))) == "private"
                 or fold(str(metadata.get("kind", ""))) == "receipt"
                 or metadata.get("generated") is True or metadata.get("archived") is True

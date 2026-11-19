@@ -169,7 +169,7 @@ def pull(config, client, *, dry_run=False, page=None, full=False, force=False,
             entries = state["pages"]
             journal = change_store.load(config)
             discovery_cache = {} if config.memory_root_page_ids else None
-            if discovery_cache is not None and not full:
+            if discovery_cache is not None and not full and page is None:
                 for id, entry in entries.items():
                     if entry.get("discovery") and not entry.get("partial"):
                         try:
@@ -177,29 +177,34 @@ def pull(config, client, *, dry_run=False, page=None, full=False, force=False,
                             discovery_cache[id] = entry["discovery"]
                         except (ValueError, OSError, KeyError, TypeError, YAMLError):
                             pass  # Local edits invalidate reuse, never authorize overwriting.
-            inventory = Inventory(client, roots[0], discovery_cache=discovery_cache).scan()
-            if discovery_cache is not None:
-                discovery_cache.update(inventory.discovery)
-            memberships = {id: {roots[0]} for id in inventory.pages}
-            for root in roots[1:]:
-                extra = Inventory(client, root, discovery_cache=discovery_cache).scan()
-                inventory.pages.update(extra.pages)
-                inventory.errors.extend(extra.errors)
-                inventory.discovery.update(extra.discovery)
-                inventory.markdown_cache.update(extra.markdown_cache)
+            inventory = Inventory(client, roots[0], discovery_cache=discovery_cache)
+            if page is not None:
+                id = canonical(page)
+                remote = retrieve(client, "page_id", id)
+                memberships = {id: {root for root in roots
+                                    if in_scope(client, remote, root, inventory.cache)}}
+                if (not memberships[id] or remote.get("archived") or remote.get("in_trash")):
+                    problem(report, "İstenen sayfa hafıza kapsamında doğrulanamadı", fatal=True)
+                    return report
+                inventory.pages[id] = remote
+            else:
+                inventory.scan()
                 if discovery_cache is not None:
-                    discovery_cache.update(extra.discovery)
-                for id in extra.pages:
-                    memberships.setdefault(id, set()).add(root)
+                    discovery_cache.update(inventory.discovery)
+                memberships = {id: {roots[0]} for id in inventory.pages}
+                for root in roots[1:]:
+                    extra = Inventory(client, root, discovery_cache=discovery_cache).scan()
+                    inventory.pages.update(extra.pages)
+                    inventory.errors.extend(extra.errors)
+                    inventory.discovery.update(extra.discovery)
+                    inventory.markdown_cache.update(extra.markdown_cache)
+                    if discovery_cache is not None:
+                        discovery_cache.update(extra.discovery)
+                    for id in extra.pages:
+                        memberships.setdefault(id, set()).add(root)
             for error in inventory.errors:
                 problem(report, error)
             selected = inventory.pages
-            if page is not None:
-                id = canonical(page)
-                if id not in selected:
-                    problem(report, "İstenen sayfa hafıza kapsamında doğrulanamadı", fatal=True)
-                    return report
-                selected = {id: selected[id]}
             for id, remote in selected.items():
                 try:
                     entry = entries.get(id)

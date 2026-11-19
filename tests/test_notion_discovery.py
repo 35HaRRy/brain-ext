@@ -8,7 +8,7 @@ from test_notion_sync import API, BLOCK, CHILD, DB, DS, ROOT, WORK, child, datab
 
 from brainext.config import Config
 from brainext.mdio import read_json, read_note, write_json
-from brainext.notion._sync import Inventory
+from brainext.notion._sync import Inventory, markdown
 from brainext.notion.client import NotionClient
 from brainext.notion.pull import pull
 
@@ -264,3 +264,80 @@ def test_unknown_normalization_requires_owned_active_leaf_page_link(setup, chang
     assert fast.complete and set(fast.pages) == {ROOT, CHILD}
     assert ROOT not in fast.discovery
     assert any(p == f"/blocks/{ROOT}/children" for _, p, _ in api.calls)
+
+
+def test_unlisted_link_preview_preserves_url_without_fetching_external_content(setup):
+    config, api, client = setup
+    api.markdown[CHILD]["markdown"] = (
+        f'Before <unknown url="https://app.notion.com/p/{CHILD}#{BLOCK}" '
+        'alt="external_object_instance"/> After'
+    )
+    block = {**child(BLOCK, CHILD, "link_preview"), "in_trash": False,
+             "link_preview": {"url": "https://example.org/ticket_(42)?q=a&view=all"}}
+    api.overrides["GET", f"/blocks/{BLOCK}"] = httpx.Response(200, json=block)
+    assert pull(config, client)["exit_code"] == 0
+    state = read_json(config.path(".brain-ext/state/notion_state.json"))
+    body = read_note(config.path(state["pages"][CHILD]["path"]))[1]
+    assert body == (
+        "Before [Link preview](https://example.org/ticket_%2842%29?q=a&view=all) After"
+    )
+    assert not state["pages"][CHILD]["partial"]
+    assert not any(p.endswith("/children") for _, p, _ in api.calls)
+
+
+@pytest.mark.parametrize("changes", [
+    {"has_children": True},
+    {"archived": True},
+    {"in_trash": True},
+    {"parent": {"type": "page_id", "page_id": WORK}},
+    {"type": "unsupported"},
+    {"link_preview": {"url": "javascript:alert(1)"}},
+    {"link_preview": {"url": "https:///missing-host"}},
+    {"link_preview": {"url": "https://example.org/\nunsafe"}},
+    {"link_preview": {"url": "https://user:secret@example.org/"}},
+    {"link_preview": {"url": None}},
+])
+def test_unverified_or_unsafe_preview_stays_partial(setup, changes):
+    _, api, client = setup
+    api.markdown[ROOT]["markdown"] = (
+        f'<unknown url="https://app.notion.com/p/{ROOT}#{BLOCK}" '
+        'alt="external_object_instance"/>'
+    )
+    block = {**child(BLOCK, ROOT, "link_preview"), "in_trash": False,
+             "link_preview": {"url": "https://example.org/ticket"}, **changes}
+    api.overrides["GET", f"/blocks/{BLOCK}"] = httpx.Response(200, json=block)
+    body, partial = markdown(client, ROOT)
+    assert partial and "notion:eksik-blok" in body
+    assert "[Link preview]" not in body
+
+
+def test_targeted_pull_verifies_membership_without_scanning_other_pages(setup):
+    config, api, client = setup
+    config = replace(config, memory_root_page_ids=(ROOT, CHILD))
+    assert pull(config, client)["exit_code"] == 0
+    state = read_json(config.path(".brain-ext/state/notion_state.json"))
+    root_path = config.path(state["pages"][ROOT]["path"])
+    before = root_path.read_bytes()
+    api.calls.clear()
+    api.overrides["GET", f"/pages/{ROOT}/markdown"] = httpx.Response(503)
+    api.markdown[CHILD]["markdown"] = "Refreshed target"
+    report = pull(config, client, page=CHILD, full=True)
+    assert report["exit_code"] == 0 and report["counts"]["updated"] == 1
+    metadata, body = read_note(config.path(state["pages"][CHILD]["path"]))
+    assert body == "Refreshed target" and metadata["memory_roots"] == sorted([ROOT, CHILD])
+    assert root_path.read_bytes() == before
+    assert not any(p.endswith("/children") or p == f"/pages/{ROOT}/markdown"
+                   for _, p, _ in api.calls)
+
+
+@pytest.mark.parametrize("changes", [
+    {"archived": True},
+    {"in_trash": True},
+    {"parent": {"type": "page_id", "page_id": WORK}},
+    {"parent": {"type": "page_id", "page_id": CHILD}},
+])
+def test_targeted_pull_rejects_trashed_or_out_of_scope_page(setup, changes):
+    config, api, client = setup
+    api.pages[CHILD].update(changes)
+    assert pull(config, client, page=CHILD)["exit_code"] == 1
+    assert not list(config.path("notion").rglob("*.md"))

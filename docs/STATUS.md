@@ -2,6 +2,51 @@
 
 Spec: `docs/spec/BRIEF-EK-1-KESIF-SONRASI.md` önceliklidir.
 
+## 2026-11-16 — Alias kontrolünün kullanıcı kararıyla kapanması
+
+- Kullanıcı, `The AI` (`6460e8de-f108-49ad-9aa8-7ccec1aa8962`) içindeki
+  `3de98389-32d9-4fd9-81fa-679d758520da` alias öğesini önemsiz bulduğunu ve
+  görmezden gelmemizi açıkça belirtti; diğer sorunlu öğeleri sildiğini bildirdi.
+  Bu karar tüm sayfanın kapsam dışına alınması veya tam içerik iddiası değildir.
+- Diğer beş sayfa önce yedeklendi, GET dışı istekleri reddeden istemciyle
+  hedefli çekildi: beşinin de exit_code=0, hata yok. İndeks ağ engelliyken
+  güncellendi: 5 güncellenmiş / 7641 değişmeyen / 0 kaldırılan, toplam 7646.
+  İlgisiz mirror state ve The AI sayfası değişmedi; dosya hash'leri doğrulandı.
+  Notion'a yazma yapılmadı.
+- Tek kalan teknik kısmi kayıt The AI'dır; kullanıcı tarafından kabul edilmiş
+  eksiklik olarak bırakıldı. Kodda genel uyarı bastırma veya ignore mekanizması
+  eklenmedi; yeni ve farklı eksiklikler bu kararla otomatik kabul edilmez.
+- Kanıt/yedek: önceki `brainext-memory-deploy-ntn518lw` işlem klasörü altında
+  `brainext-alias-check-126mo5oe/backup` ve `result.json`.
+
+## 2026-11-15 — Kısmi sayfalar ve bağlantı önizlemeleri
+
+- Sekiz kısmi sayfanın canlı salt okunur tanısı: Markdown kesilmemiş,
+  `unknown_block_ids` boş; bilinmeyen etiketlerin blok API karşılığı 7
+  `unsupported` alias, 4 `link_preview`, 3 normal `link_to_page`.
+  Mevcut normal bağlantı desteği korunarak doğrulanmış aktif/çocuksuz
+  önizlemeler HTTP(S) Markdown bağlantısına dönüştürüldü. Dış hedefler
+  indirilmez; güvensiz URL veya doğrulanamayan aidiyet kısmi kalır.
+- `pull --page` artık tüm ağaçları taramak yerine hedefin ebeveyn zincirini
+  yapılandırılmış köklere göre doğrular. Çoklu kök üyeliği, kapsam dışı/trash
+  reddi ve ilgisiz dosyaların korunması regresyon testleriyle kontrol edildi.
+- Başarısız test önce görüldü; son Python suite **354 passed, 4 skipped**,
+  Node **12/12**, Ruff ve diff kontrolü temiz. Tam suite ayrıca README
+  geliştirme kurulumundaki `.[dev,semantic]` eksikliğini yakaladı; düzeltildi.
+- Kullanıcı onayıyla sekiz sayfa ve state/index önce yedeklendi. GET dışı
+  istekleri reddeden istemciyle hedefli dry-run ve gerçek pull yapıldı;
+  indeksleme sırasında ağ engellendi. İlgisiz mirror state değişmedi;
+  Notion'a sıfır yazma, indekste 8 güncellenmiş / 7638 değişmeyen / 0 kaldırılan.
+- Dört önizleme bağlantısı korundu. `Örnek sp ticket’ları` (`d3629547`) ve
+  `“All Users” bug’ları` (`fe9249e2`) artık tam; kısmi sayfa sayısı **8 → 6**.
+  Kalan altı sayfadaki yedi alias için API yalnız `unsupported` bildiriyor;
+  hedef uydurulmadı, eksik işaretleri ve kısmi statü korundu. Hedeflerin
+  Notion arayüzünden incelenmesi hâlâ gerekli.
+- Kanıt/yedek: önceki `brainext-memory-deploy-ntn518lw` işlem klasörü altında
+  `brainext-preview-refresh-0un7jysz/backup`, `pull-result.json`, `result.json`.
+  Önceki `initial-import-20261114/partial-pages.json` tarihsel sekizli listedir;
+  güncel kalanlar yeni rapordaki `partial: true` kayıtlarıdır.
+
 ## 2026-11-14 — Notion ana kaynaklı hafıza ve değişiklik kuyruğu
 
 Yeni kapsam/politika: Me ve Carrier alt ağaçları için isteğe bağlı

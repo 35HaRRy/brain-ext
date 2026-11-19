@@ -62,6 +62,8 @@ brainext pull --full --json
 `pull` reads remote content and writes local mirror/state files; it never requests
 remote page changes. `--page` targets a page within the configured scope.
 `--full` bypasses the discovery cache, not scope or safety checks.
+A targeted pull verifies the page's parent chain against the configured roots
+without scanning unrelated page trees; it does not process other pages or archives.
 
 Discovery follows physical child pages and databases, pages through database rows,
 and verified parent chains. Complete v2 Markdown speeds discovery; incomplete
@@ -73,6 +75,9 @@ also performs discovery; it is not a cheap page count.
 
 Missing/unsupported content is marked and reported as partial, not silently
 declared complete. Disappearance or a 403/404 alone is not proof of deletion.
+Verified active, childless link previews are preserved as ordinary HTTP(S)
+Markdown links; their rich preview cards are not mirrored. Unsupported alias
+blocks remain explicitly marked as incomplete rather than guessed.
 Confirmed trash can archive a local mirror under `_arsiv/`; local edits or pending
 proposals can instead cause a conflict. Archived and out-of-scope notes leave active search.
 
@@ -234,7 +239,7 @@ Unapproved drafts are skipped; this route is restricted to Agent Workspace.
 ## Development checks
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,semantic]"
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\ruff.exe check .
 node --test integrations/opencode/shared-memory/index.test.mjs

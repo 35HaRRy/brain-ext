@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from uuid import UUID
 
 from brainext.mdio import read_json
@@ -152,10 +152,21 @@ def in_scope(client, obj, root, cache=None):
 
 
 def _leaf_link(block):
+    if (block.get("object") != "block" or block.get("has_children") is not False
+            or block.get("archived") or block.get("in_trash")):
+        return None
+    if block.get("type") == "link_preview":
+        preview = block.get("link_preview")
+        url = preview.get("url") if isinstance(preview, dict) else None
+        if not isinstance(url, str) or any(c.isspace() or ord(c) < 32 for c in url):
+            return None
+        parsed = urlsplit(url)
+        if (parsed.scheme not in {"https", "http"} or not parsed.hostname
+                or parsed.username is not None or parsed.password is not None):
+            return None
+        return f"[Link preview]({quote(url, safe=':/?#@!$&*+,;=%~_-')})"
     link = block.get("link_to_page")
-    if (block.get("object") == "block" and block.get("type") == "link_to_page"
-            and block.get("has_children") is False
-            and not block.get("archived") and not block.get("in_trash")
+    if (block.get("type") == "link_to_page"
             and isinstance(link, dict) and link.get("type") in {"page_id", "database_id"}):
         type = link["type"]
         target = canonical(link.get(type)).replace("-", "")

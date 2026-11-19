@@ -171,6 +171,14 @@ Indexing and embeddings run locally, but passages given to an assistant go to
 its model provider. Notion API calls go to Notion. Mark sensitive local notes
 `visibility: private`; project scoping is not an operating-system sandbox.
 
+For the full development test suite, install both test and semantic dependencies
+(this does not download a model):
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,semantic]"
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
 ## 4. Example: recall a decision and publish a follow-up
 
 After installation, suppose your Notion project tree contains a hosting decision.

@@ -3,7 +3,7 @@ import { isAbsolute, normalize } from 'node:path'
 
 const MARKER = '[brainext.shared-memory]'
 const states = new Map()
-const actions = ['context', 'catalog', 'register', 'bind', 'ignore', 'skip', 'search',
+const actions = ['context', 'catalog', 'register', 'bind', 'ignore', 'skip', 'search', 'recap', 'history',
   'note-read', 'note-create', 'note-edit', 'task-create', 'task-update', 'receipt']
 const writes = new Set(['register', 'bind', 'ignore', 'note-create', 'note-edit',
   'task-create', 'task-update', 'receipt'])
@@ -24,6 +24,7 @@ note-create: source,text,metadata. task-create: aynı alanlar ve confirmed:true;
 task-update: id,expected_revision,changes,confirmed:true. receipt: event_id,summary,refs (vault-relative kaynaklar).
 Genel/projesiz veya arızalı oturumdan projeye yazma. Her mesajda zorunlu kayıt oluşturma.
 Diğer projeyi aramak için kullanıcının açık isteğiyle search payload project,query,cross_project_confirmed:true kullan.
+Yakın dönem için recap: {}; kayıt geçmişi için history: {id}. İkisi de yalnız etkin projeyi okur. Recap özetleri doğrulanmış olgu değil, ajan kayıtlarıdır.
 Kullanıcının no-memory/no-tools ve mahremiyet sınırları önceliklidir. Gizli notları bağlama taşıma.
 Bu kapsam seçimi OS sandbox'ı değildir; kaynak parçaları mevcut model sağlayıcısına gider.`
 

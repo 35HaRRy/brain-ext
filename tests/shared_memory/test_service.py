@@ -23,6 +23,34 @@ def bind(service, directory, project="alpha", revision=0):
                                   expected_revision=revision, confirmed=True))
 
 
+@pytest.mark.parametrize(("action", "payload"), [("recap", {}), ("history", {"id": "alpha"})])
+def test_project_activity_reads(service, tmp_path, action, payload):
+    root = tmp_path / "code"
+    root.mkdir()
+    assert service.handle(request(root, action, **payload))["status"] == "invalid"
+    assert bind(service, root)["status"] == "ok"
+    receipt = service.handle(request(root, "receipt", event_id="activity",
+                                     summary="Alpha activity", refs=["projects/alpha/Project.md"]))
+    assert receipt["status"] == "ok", receipt
+    if action == "recap":
+        from brainext.shared_memory.runtime import VaultRuntime
+
+        VaultRuntime(service.vault).beyin("receipt", {
+            "event_id": "mixed-activity", "session": "mixed-session",
+            "summary": "Must not appear",
+            "refs": ["projects/alpha/Project.md", "projects/beta/Project.md"],
+        })
+    result = service.handle(request(root, action, **payload))
+    assert result["status"] == "ok", result
+    assert len(result["result"]["entries"]) == 1
+    assert service.handle(request(root, action, project="beta", **payload))["status"] == "invalid"
+    skipped = request(root, action, **payload)
+    skipped["session"]["general_only"] = True
+    assert service.handle(skipped)["status"] == "invalid"
+    if action == "history":
+        assert service.handle(request(root, action, id="beta"))["result"]["entries"] == []
+
+
 def test_unknown_context_does_not_create_files(service, tmp_path):
     root = tmp_path / "code"
     root.mkdir()

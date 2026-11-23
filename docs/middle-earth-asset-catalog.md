@@ -1,0 +1,48 @@
+# Orta Dünya — harita ve stok görsel kataloğu
+
+**Kısa liste:** Sisli orman, dağ bulutu ve kayalıklara vuran dalgalar hareketli ambiyans adayları; `Paper 001` şematik harita zemini, Alegreya ve IBM Plex Sans yazı tipi adayları. Stoklar kurmaca coğrafyanın kanıtı değil. Tolkien haritaları yalnız kaynak incelemesi için listeleniyor; yayın varlığı olarak onaylanmadı.
+
+Bu nottaki Mavi Dağlar ve Beleriand'ın sular altında kalması, alternatif bir coğrafya prologu. [Yapım değerlendirmesindeki](middle-earth-production-research.md) Ani Alev Savaşı pilotuyla aynı bölüm değil.
+
+Source pages and published terms checked 2026-11-22. Stock assets are candidates, not Tolkien illustrations or canon evidence. No media files were downloaded; framing, audio, seams, and delivery resolution still need a shot review.
+
+## Stock candidates
+
+The four video pages identify the [Pexels License](https://www.pexels.com/license/): editing and use are allowed, including in social videos, without mandatory credit. Don't imply endorsement, use the clips as marks, or redistribute them as stock. This is a stock license, not public domain.
+
+| Candidate and source | Use in the series | License and handling |
+| --- | --- | --- |
+| [Clouds over Trees in Forest](https://www.pexels.com/video/clouds-over-trees-in-forest-12228649/) — Danilo Arenas | Moving ambience: fog passes over a forest canopy before introducing Doriath. Keep the landscape illustrative rather than labeling the shot itself as Doriath. | Pexels License; credit optional. |
+| [Sea Waves Crashing against Rocks](https://www.pexels.com/video/sea-waves-crashing-against-rocks-10831504/) — Sami Aksu | Tight surf insert for the end-of-Age transition. Dissolve from the map to foam rather than animating a supposedly documented flood path. | Pexels License; credit optional. |
+| [A view of the ocean from a cliff](https://www.pexels.com/video/a-view-of-the-ocean-from-a-cliff-16710493/) — Erik Mclean | Overcast coast for the opening or closing hold; use it to establish the sea as a visual motif, not to depict the shape of Beleriand. | Pexels License; credit optional. |
+| [Moving Clouds Over Mountains](https://www.pexels.com/video/moving-clouds-over-mountains-6341893/) — gusat silviu | Cutaway when the narration introduces the Blue Mountains; return to a labeled diagram for the actual west/east relationship. | Pexels License; credit optional. |
+| [Misty river.webm](https://commons.wikimedia.org/wiki/File:Misty_river.webm) — Digitura | Own-work motion clip for a river chapter or a quiet background between didactic cards. Don't infer the course of the Sirion from it. | File page declares [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/); no required attribution, but log the source. Review the audio before using it. |
+| [Reynisfjara, Vík í Mýrdal](https://commons.wikimedia.org/wiki/File:2014-05-07_07-24-32_Iceland_-_Reynisfjara_-_V%C3%ADk_%C3%AD_M%C3%BDrdal_7h_148%C2%B0.JPG) — Hansueli Krapf | Optional still for a slow coastal pan; caption it as Iceland if identifiable. Don't use the shoreline as a map base. | File page offers [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Credit author, link source and license, indicate changes, and apply ShareAlike to distributed adaptations of the image as required. Prefer the Pexels coast if that treatment is unclear. |
+| [Paper 001](https://ambientcg.com/view?id=Paper001) — ambientCG | White paper grain behind the schematic or title card. Tint subtly and keep grain away from small labels. | [CC0 1.0](https://docs.ambientcg.com/license/), including the downloadable maps. Use the color texture, not a historic map with real coastlines or labels baked in. |
+| [Alegreya](https://github.com/huertatipografica/Alegreya) — Huerta Tipográfica | Serif for chapter titles and large place names. Use ordinary Latin lettering, not an imitation of Tolkien's scripts, lettering, or branding. | [SIL OFL 1.1](https://github.com/google/fonts/blob/main/ofl/alegreya/OFL.txt). Rendered titles do not inherit the font license; retain notices if distributing the font files. |
+| [IBM Plex Sans](https://github.com/IBM/plex) — IBM | Legend, dates, map labels, and captions. Test accents such as **ú** and **û** and label contrast at phone size. | [SIL OFL 1.1](https://github.com/google/fonts/blob/main/ofl/ibmplexsans/OFL.txt). Retain notices if distributing font files; check the Reserved Font Name terms if modifying them. |
+
+## Tolkien maps: reference only
+
+| Official source | What it can verify | Keep out of the timeline |
+| --- | --- | --- |
+| J.R.R. Tolkien's small-scale 1930s *Quenta Silmarillion* map, in the [Tolkien Estate Maps gallery](https://www.tolkienestate.com/painting/maps/) | The Estate identifies it as a map of Beleriand and the lands later covered by the sea. It is an earlier manuscript witness, not a substitute for the published account. | No facsimile, screenshot, crop, texture sampling, or vector tracing. |
+| Christopher Tolkien's **Beleriand and the Lands to the North**, in a copy of [*The Silmarillion*, HarperCollins](https://www.harpercollins.com/products/the-silmarillion-illustrated-edition-j-r-r-tolkien) | Companion map to check relative locations against the published text. The publisher link identifies the book, not a licensed map file; log the map credit and edition from the copy consulted. | No scans, redraws of the published composition, or animated overlays on top of it without clearance. |
+| J.R.R. Tolkien's north-west Middle-earth map, c. 1948, in the [Tolkien Estate Maps gallery](https://www.tolkienestate.com/painting/maps/) | A later-age comparison only. [Christopher Tolkien's 1977 introduction](https://www.tolkienestate.com/writing/christopher-tolkien-the-silmarillion/) explains the link via the Blue Mountains and why Beleriand isn't on the map that accompanies *The Lord of the Rings*. | Don't repurpose the Third Age geography as the First Age or use a film, game, or fan redraw as a shortcut to clearance. |
+
+The [Tolkien Estate FAQ](https://www.tolkienestate.com/frequently-asked-questions-and-links/) states that Tolkien's maps and other graphic works are protected and may not be copied. It directs bona fide image reproduction inquiries to the Bodleian in the first instance for licensing guidance and published quotation requests to HarperCollins. Those routes are not permission. [Middle-earth Enterprises' licensing page](https://www.middleearth.com/licensing) describes rights for certain works, including *The Hobbit* and *The Lord of the Rings*; don't assume that it covers *The Silmarillion* or a particular map. A public gallery, apparent fan license, or museum holding is not upload clearance.
+
+## First Age candidate: Beleriand west of the Blue Mountains
+
+**Best fit:** a map-led explainer with an elegiac landscape opening and closing. The useful teaching point is spatial and temporal: put the Blue Mountains at the east edge of a pre-cataclysm Beleriand view, then distinguish that First Age view from the later geography. Christopher Tolkien's introduction directly supports the west-of-the-Blue-Mountains relationship and the end-of-Age inundation. It does not supply a precise flood animation or a surveyed coastline.
+
+- **Moving ambience:** start with Arenas's forest fog or Mclean's overcast cliffs; reserve Aksu's surf for the closing transition. Don't present real-world shots as evidence for fictional terrain.
+- **Didactic beat:** introduce a fixed west/east orientation, the sea, the Blue Mountains, and only the places the narration needs. Use paper grain and clear type, not dense faux-medieval labeling.
+- **Animated map:** prototype with original region blocks, ridge marks, and point labels rather than a detailed political atlas. Reveal regions in narration order; move from a clearly labeled “before” view to a symbolic loss of land at the end of the First Age. Mark it “schematic · not to scale.” Check any surviving land or islands against the published text before adding them; don't use a blanket wipe to imply that every feature vanished.
+- **Editorial baseline:** verify region names, relative placement, date/era, and the before/after account against the chosen edition of *The Silmarillion* (especially *Quenta Silmarillion*, chs. 14 and 24, plus the map). Record chapter/page or map credit per claim. Flag conflicting drafts, approximate routes, and invented details; don't import adaptation geography or present an editorial choice as settled canon.
+
+## Before upload
+
+1. Review the actual picture and any embedded audio. Log the asset URL/ID, creator, license/version, date, edits, and required credits; check recognizable people, marks, and other third-party material. Keep evidence of the license for the chosen file/version.
+2. Review the exported map separately. An independently drawn schematic avoids copying the published map's particular outlines, linework, lettering, symbols, and layout; it **does not** clear underlying Tolkien IP, including any protectable story-world material or relevant marks. Tracing or restyling doesn't clear either layer. Evaluate the actual use, territory, permissions or applicable exceptions with the rights lead before publishing; “educational,” “fan-made,” and “noncommercial” aren't blanket permissions.
+3. Check the final video, thumbnail, title, captions, and promotional cut for uncleared quotations, art, scripts, branding, or implied affiliation. Confirm credits and license compatibility, and monitor the platform's copyright checks ([YouTube Content ID](https://support.google.com/youtube/answer/2797370?hl=en), if applicable). A clean automated scan is not clearance.

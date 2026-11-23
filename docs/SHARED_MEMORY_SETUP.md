@@ -55,7 +55,7 @@ Mevcut global `opencode.json(c)` dosyasının `plugins` listesi **korunarak** ş
 
 ## Sağlık ve sınırlar
 
-- Uyum hedefi Beyin **3.12.0**, OpenCode **v2.2.7**. Beyin sürümü değişirse adaptör uyum testi yenilenene kadar hafıza erişimini durdurur; geniş aramaya düşmez.
+- Doğrulanmış Beyin sürümleri **3.12.0 ve 3.14.1**; ilk OpenCode doğrulaması **v2.2.7**, 2026-11-22 yükseltme kontrolü **v2.3.2** ile yapıldı. Başka bir Beyin sürümünde uyum testi yenilenene kadar adaptör hafıza erişimini durdurur; geniş aramaya düşmez.
 - Normal yanıtta `Proje: … · Mod: …` bilgisi istenir. Hata halinde hafıza kullanılamadığı bildirilir; kodlama devam edebilir.
 - `opencode plugin list` ile yüklemeyi, OpenCode loglarıyla setup hatalarını kontrol edin. Plugin hiç yüklenemiyorsa kendi uyarısını da üretemez; sessizliği başarı saymayın.
 - Kapsam seçimi dosya erişim sandbox'ı değildir. Genel shell/dosya araçları ayrıca izinlerle yönetilir. Model bağlamına verilen metin model sağlayıcısına gider.
@@ -96,3 +96,19 @@ Son tam Python paketi: **251 passed, 4 skipped**; Node **12/12**; Ruff ve diff k
 - Onay bayrakları ve OpenCode izinleri OS sandbox veya kriptografik kullanıcı niyeti kanıtı değildir; genel shell/dosya erişimi ayrıca yönetilir.
 
 Sentetik dar geri alma deneyi sonradan eklenen kullanıcı alanını ve plugin'ini korudu; gerçek global config geri alınmadı. Son doğrulama tekrarında Python 251/4 (101.32s), Node 12/12, Ruff/diff temiz. Henüz gerçek görev/proje kaydı oluşturulmadı. Bu entegrasyon için işin tamamını yeniden geliştirmek yerine ilk gerçek proje tanımlaması ve doğal dil kabulünden devam edin.
+
+## 2026-11-22 — AvenoxBeyin 3.14.1 güncellemesi
+
+- Kullanıcı upstream güncellemelerini istedi. Hareketli `main` yerine resmî son stable release **v3.14.1** seçildi. Önceki kurulum **3.12.0** idi.
+- Ürün ZIP'inin SHA-256 değeri GitHub asset digest ve yayımlanan `.sha256` ile eşleşti: `4ed526621e817a0b00574438138f8ddc9f7646be7887755163d426561e3faa70`.
+- Önce resmî installer ile tamamen geçici bir test vault'u kuruldu. Adaptörün 3.12.0 sürüm kilidi yeni runtime ile beklendiği gibi RED verdi; yalnız açıkça doğrulanmış 3.14.1 listeye eklendi. **50 shared-memory testi geçti, 1 symlink-yetki testi atlandı.**
+- Gerçek vault yalnız kendi `beyin.py update --package ... --json` updater'ıyla güncellendi: `updated`, `from_version: 3.12.0`, `version: 3.14.1`, `trust_review_required: false`. Motor/skill/adaptörler resmî yönetilen paket üzerinden geldi; kullanıcı notlarına veya özel Notion kurallarına release dosyaları kopyalanmadı.
+- Öncesinde kullanıcı Markdown'ı/özel entegrasyon dosyaları için yerel yedek ve hash manifesti, SQLite online backup ve registry yedeği alındı. Sonrasında kontrol edilen **7.676 dosyanın tamamı** ve registry byte-exact korundu. Bu dosya sayısı tam bir sır denetimi veya bağımsız uzak yedek anlamına gelmez.
+- Bu kontrolden sonra yükseltme sonucu proje notuna ve receipt'e kaydedildi. Son hash kontrolünde yalnız üç türetilmiş görünüm değişti (`daily/v3/` altında iki eski günlük ve `knowledge/v3/outcomes.md`); bunlar receipt/sync tarafından yeniden üretilir. Önceden var olan diğer 7.673 dosya ve registry aynı kaldı; kullanıcı kaynaklarının geri yazılması veya yedekten restorasyonu yapılmadı.
+- Son `doctor`: çıkış 0, `observed_metadata`, hook hatası yok, state-konumu uyarıları boş. Bu sonuç bütün istemcilerin davranış kabulü anlamına gelmez; diğer önceden var olan advisory bulgular kendiliğinden kapatılmış sayılmaz.
+- Gerçek `shared_memory context`: `ok`, `project`, `brain-ext`, uyarı yok. OpenCode v2.3.2'de kod deposu ve vault için yeni adaptör active; eski `beyin-v3` devre dışı kalıyor.
+- Yeni runtime ile tam Python suite **357 passed, 4 skipped**; Node **12/12**; Ruff temiz. Başlangıç suite'i bu tarihte 354/4 idi; önceki 251 sayısı tarihsel ilk kurulum kaydıdır.
+- 3.14.0'dan gelen çekirdek yenilikler: selftest, gözden geçirme/web görünümü iyileştirmeleri, arama ve güvenli yazma düzeltmeleri. **3.14.1'in isteğe bağlı video motoru kurulmadı.** Yakala kurulu olmadığından dinleyici yenileme veya yeni servis başlatma yapılmadı.
+- Güncelleme yetkisi model indirme, Jev/video eklentisi açma, Notion'a yazma, geniş izin veya yeni otomasyon kurma izni sayılmadı.
+
+Kaynaklar: [3.14.1 release](https://github.com/avenoxai/avenoxbeyin/releases/tag/v3.14.1), [3.14.0 notları](https://github.com/avenoxai/avenoxbeyin/releases/tag/v3.14.0), [resmî güncelleme rehberi](https://github.com/avenoxai/avenoxbeyin/blob/v3.14.1/docs/v3/UPDATE.md).

@@ -12,6 +12,8 @@ from pathlib import Path
 from brainext.mdio import safe_path
 from brainext.shared_memory.registry import project_id
 
+SUPPORTED_BEYIN_VERSIONS = {"3.12.0", "3.14.1"}
+
 
 class RuntimeUnavailable(ValueError):
     """The installed source-backed runtime cannot safely serve this request."""
@@ -28,7 +30,7 @@ class VaultRuntime:
     def __init__(self, vault: Path):
         self.vault = vault.resolve(strict=True)
         self.scripts = safe_path(self.vault, ".claude/scripts")
-        if safe_path(self.vault, ".beyin-version").read_text().strip() != "3.12.0":
+        if safe_path(self.vault, ".beyin-version").read_text().strip() not in SUPPORTED_BEYIN_VERSIONS:
             raise RuntimeUnavailable("runtime_version")
         pin = json.loads(safe_path(self.vault, ".beyin-runtime.json").read_text("utf-8"))
         self.state = Path(pin["state"])
@@ -124,6 +126,31 @@ class VaultRuntime:
         safe_path(self.vault, source)
         records, _ = self.store._eligible()
         return next((r for r in records if r["source"] == source), None)
+
+    def recap(self, project: str) -> list[dict]:
+        projections = self._load("beyin_v3_projections")
+        records, _ = self.store._eligible()
+        sources = {r["source"] for r in records if self.record_project(r) == project}
+        with self.store._connect() as db:
+            # shortcut: scans the newest 100 receipts, add scoped pagination if busy vaults need more.
+            items = projections.recent_receipts(db, days=7, limit=100, vault=self.vault)["items"]
+        return [
+            {key: item[key] for key in ("source", "created_at", "summary", "refs")}
+            for item in items
+            if item["refs"] and not item.get("refs_withheld") and sources.issuperset(item["refs"])
+        ][:20]
+
+    def history(self, project: str, id: str) -> list[dict]:
+        records, _ = self.store._eligible()
+        sources = {r["source"] for r in records
+                   if r["id"] == id and self.record_project(r) == project}
+        if not sources:
+            return []
+        return [
+            entry for entry in self.store.history(id)
+            if entry["record"].get("source") in sources
+            and self.record_project(entry["record"]) == project
+        ][-20:]
 
     def beyin(self, command: str, payload: dict | None = None) -> dict:
         if command not in {"sync", "note-create", "note-read", "note-edit", "task-create",

@@ -112,6 +112,17 @@ class MemoryService:
                     raise ValueError("cross_project_confirmation")
                 result = runtime.project_context(target, payload["query"], 6000)
                 return response(mode=mode, project=project, records=result["records"], result=result)
+            if action in {"recap", "history"}:
+                if not project:
+                    raise ValueError("project_required")
+                if action == "recap" and not payload:
+                    entries = runtime.recap(project)
+                elif (action == "history" and set(payload) == {"id"}
+                      and isinstance(payload["id"], str) and payload["id"].strip()):
+                    entries = runtime.history(project, payload["id"])
+                else:
+                    raise ValueError("activity_payload")
+                return response(mode=mode, project=project, result={"entries": entries})
             result = self._write(runtime, project, action, payload, session)
             status = "conflict" if result.get("status") == "conflict" else "ok"
             return response(status, mode, project=project, result=result)

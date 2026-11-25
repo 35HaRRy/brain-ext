@@ -441,11 +441,61 @@ def test_incomplete_markdown_response_schema_cannot_authorize_writes(queue_setup
     assert not mutations(api)
 
 
+def test_create_reconciles_despite_notion_markdown_normalization(queue_setup):
+    config, api, client = queue_setup
+    proposal(config, client, "create", OUTSIDE, title="Not", body="`kod` ve https://x.test\n")
+    approve_all(config)
+    api.post_status, api.commit = 503, False
+    assert changes().apply(config, client)["counts"]["uncertain"] == 1
+    # Notion did create the page, but writes inline code and bare URLs back in its own form.
+    sent = f"`kod` ve https://x.test\n\nbrainext-push-id: {rows(config)[0]['id']}\n"
+    api.pages[CREATED] = page(CREATED, OUTSIDE, title="Not")
+    api.children[OUTSIDE].append(child(CREATED, OUTSIDE))
+    api.children[CREATED] = []
+    api.markdown[CREATED] = {
+        "markdown": sent.replace("`kod`", "<code>kod</code>").replace(
+            "https://x.test", "[https://x.test](https://x.test)"),
+        "truncated": False, "unknown_block_ids": [],
+    }
+    changes().apply(config, client)
+    assert rows(config)[0]["status"] == "applied"
+
+
 def test_targeted_edit_must_not_change_a_structural_tag_attribute(queue_setup):
     config, api, client = queue_setup
     api.markdown[CHILD]["markdown"] = '<page url="https://app.notion.com/p/abc">Title</page>'
     assert proposal(config, client, old_str="https://app.notion.com/p/abc",
                     new_str="https://example.com")["exit_code"] == 1
+
+
+def test_alias_link_unknown_tag_still_allows_targeted_edit(queue_setup):
+    config, api, client = queue_setup
+    alias = '<unknown url="https://app.notion.com/p/x#y" alt="alias" />'
+    api.markdown[CHILD]["markdown"] = f"İçerik\n\n{alias}\n\nKuyruk\n"
+    assert proposal(config, client)["exit_code"] == 0
+    approve_all(config)
+    assert changes().apply(config, client)["counts"]["applied"] == 1
+    assert api.markdown[CHILD]["markdown"] == f"Yeni içerik\n\n{alias}\n\nKuyruk\n"
+
+
+def test_other_unknown_tags_still_block_targeted_edit(queue_setup):
+    config, api, client = queue_setup
+    api.markdown[CHILD]["markdown"] = (
+        'İçerik\n\n<unknown url="https://app.notion.com/p/x#y" alt="alias" />\n\n<unknown url="z" />\n')
+    assert proposal(config, client)["exit_code"] == 1
+    assert not mutations(api)
+
+
+def test_volatile_request_id_does_not_invalidate_snapshot(queue_setup, monkeypatch):
+    config, api, client = queue_setup
+    real = changes().retrieve
+    counter = iter(range(1000))
+    monkeypatch.setattr(changes(), "retrieve",
+                        lambda *a, **k: {**real(*a, **k), "request_id": str(next(counter))})
+    assert proposal(config, client)["exit_code"] == 0
+    approve_all(config)
+    assert changes().apply(config, client, dry_run=True)["counts"]["planned"] == 1
+    assert not mutations(api)
 
 
 def test_configured_root_inside_deleted_subtree_is_also_protected(queue_setup):

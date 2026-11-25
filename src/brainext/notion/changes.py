@@ -24,6 +24,10 @@ from brainext.notion.push import _workspace
 
 ERRORS = (ValueError, OSError, NotionError, KeyError, TypeError)
 STRUCTURAL = re.compile(r"</?[a-zA-Z][^>]*>")
+# A `link_to_page` alias renders as an unknown tag with no text, so a targeted string edit
+# still round-trips; every other unknown tag stays fatal. Keep the allowlist this narrow.
+UNKNOWN = re.compile(r"<unknown\b[^>]*>", re.IGNORECASE)
+ALIAS = re.compile(r'<unknown\b[^>]*\balt="alias"[^>]*/>', re.IGNORECASE)
 
 
 def _active(page):
@@ -31,17 +35,23 @@ def _active(page):
         raise ValueError("Sayfa çöp kutusunda")
 
 
+def _stable(page):
+    # `request_id` is per-response metadata, so two identical reads always differ on it.
+    return {key: value for key, value in page.items() if key != "request_id"}
+
+
 def _snapshot(client, id):
     page = retrieve(client, "page_id", id)
     _active(page)
     data = client.request("GET", f"/pages/{id}/markdown", params={"markdown_version": "v2"})
-    if (not isinstance(data.get("markdown"), str) or data.get("truncated") is not False
+    markdown = data.get("markdown")
+    if (not isinstance(markdown, str) or data.get("truncated") is not False
             or not isinstance(data.get("unknown_block_ids"), list)
             or data["unknown_block_ids"] or data.get("warnings")
-            or re.search(r"<unknown\b", data["markdown"], re.IGNORECASE)):
+            or len(UNKNOWN.findall(markdown)) != len(ALIAS.findall(markdown))):
         raise ValueError("Eksik Markdown yazılamaz")
     after = retrieve(client, "page_id", id)
-    if page != after or not isinstance(page.get("last_edited_time"), str):
+    if _stable(page) != _stable(after) or not isinstance(page.get("last_edited_time"), str):
         raise ValueError("Sayfa okuma sırasında değişti")
     return {"page": page, "body": data["markdown"], "title": _title(page)}
 
@@ -188,7 +198,13 @@ def _check(config, client, state, op):
         current = _tree(client, target)
     else:
         current = {"pages": {target: _snapshot(client, target)}, "containers": {}}
-    if current != op["baseline"]:
+    def stable_tree(tree):
+        return {**tree, "pages": {
+            id: {**snapshot, "page": _stable(snapshot["page"])}
+            for id, snapshot in tree["pages"].items()
+        }}
+
+    if stable_tree(current) != stable_tree(op["baseline"]):
         raise ValueError("Notion sürümü onaydan sonra değişti")
 
 
@@ -211,9 +227,11 @@ def _recover(client, op, hint=None):
     def matches_request(id):
         snapshot = _snapshot(client, canonical(id))
         parent = op["baseline"]["parent"]
+        # The marker is appended last, so seeing it proves the whole body landed. Notion also
+        # normalizes markdown on write (inline code, bare URLs), so exact text is not identity.
         return (canonical(id) != target
                 and parent_ref(snapshot["page"]) == (parent["type"], parent[parent["type"]])
-                and snapshot["body"].strip() == _content(op).strip()
+                and snapshot["body"].strip().splitlines()[-1:] == ["brainext-push-id: " + op["id"]]
                 and snapshot["title"] == op["title"])
 
     if hint:
